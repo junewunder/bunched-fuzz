@@ -37,6 +37,12 @@ let alt_ergo : Whyconf.config_prover =
   (* all provers that have the name "Alt-Ergo" *)
   let provers = Whyconf.filter_provers WC.config fp in
   if Whyconf.Mprover.is_empty provers then begin
+    Format.eprintf "heyyy@.";
+    Format.eprintf "provers empty: %b@." @@ Whyconf.Mprover.is_empty @@ Whyconf.get_provers WC.config;
+    List.iter
+      (fun p -> print_endline (Whyconf.get_complete_command p ~with_steps:false))
+      (Whyconf.Mprover.values @@ Whyconf.get_provers WC.config);
+    print_endline @@ Whyconf.get_conf_file WC.config;
     Format.eprintf "Prover Alt-Ergo not installed or not configured@.";
     exit 0
   end else
@@ -44,9 +50,8 @@ let alt_ergo : Whyconf.config_prover =
 
 (* loading the Alt-Ergo driver *)
 let alt_ergo_driver : Driver.driver =
-  let main = Whyconf.get_main WC.config in
   try
-    Whyconf.load_driver main WC.env alt_ergo.Whyconf.driver []
+    Whyconf.load_driver WC.main WC.env alt_ergo
   with e ->
     Format.eprintf "Failed to load driver for alt-ergo: %a@."
       Exn_printer.exn_printer e;
@@ -68,13 +73,22 @@ let post cs =
   why_info   dp "calling solver....";
   why_debug3 dp "why3 task is: @[@\n%a@]@." Pretty.print_task task;
 
+  let libdir = Whyconf.libdir WC.main in
+  let datadir = Whyconf.datadir WC.main in
+
   let result : Call_provers.prover_result =
-    Call_provers.wait_on_call
-      (Driver.prove_task ~command:alt_ergo.Whyconf.command
-  	 alt_ergo_driver task ~limit:CP.empty_limit)
+    Call_provers.wait_on_call (
+      Driver.prove_task
+        ~limit:CP.empty_limit
+        ~command:alt_ergo.Whyconf.command
+        ~libdir
+        ~datadir
+  	    alt_ergo_driver
+        task
+      )
   in
 
-  why_info dp "@[alt-ergo answers %a@]@." Call_provers.print_prover_result result;
+  why_info dp "@[alt-ergo answers %a@]@." (Call_provers.print_prover_result ?json:None) result;
   match result.CP.pr_answer with
   | CP.Valid   -> true
   | CP.Invalid -> false
