@@ -23,7 +23,7 @@ $ opam install --deps-only -d -t .
 then run
 
 ```
-$ why3 config --detect
+$ why3 config detect
 $ dune build
 ```
 
@@ -40,3 +40,25 @@ $ dune exec -- dfuzz examples/dfuzz/cdf.fz
 Running the program is still not supported in dFuzz.
 
 
+# june installation process
+
+I think I have updated all the versions of everything, my addition is to use the commands
+
+```
+$ why3 config detect
+$ why3 config show
+```
+
+and then copy-paste the result into `~/.why3.conf` (maybe the first command is unnecessary)
+
+the issue I had is the `detect` subcommand makes a `[partial_prover]` entry and no `[strategy]` entries and this
+seems to not get picked up by why3 current version for some reason. not sure what's up there.
+
+after that
+
+```
+$ dune build
+$ dune exec -- dfuzz examples/dfuzz/cdf.fz
+```
+
+and it should work
