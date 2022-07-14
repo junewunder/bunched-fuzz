@@ -1,3 +1,4 @@
+*.log
 .merlin
 _build
 *.install
