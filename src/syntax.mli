@@ -5,6 +5,7 @@
    See the LICENSE file for details on licensing.
 *)
 open Support.FileInfo
+open Bunch
 
 (* Different types of variable binding, for debug purposes *)
 type fuzz_binding =
@@ -13,20 +14,26 @@ type fuzz_binding =
   | BiETyVar (* Existential variable  *)
 
 (* Variables and binders *)
-type var_info = {
-  v_index : int;
+type 'a var_info = {
+  (* Indexes start a 0 *)
+  v_index : 'a;
 
   (* Debug fields *)
   v_name  : string;
-  v_size  : int;
   v_type  : fuzz_binding;
+  v_size  : int;
 }
 
-(* Default var_info *)
-val dvi : var_info
+(* Contexts of type 'a *)
+type list_var = int var_info
+type bunch_var = path var_info
+type 'a list_ctx = (list_var * 'a) list
+type 'a bunch_ctx = (bunch_var * 'a) bunch
 
 (* Adds n to a var_info *)
-val var_shift : int -> int -> var_info -> var_info
+val var_shift : int -> int -> list_var -> list_var
+val var_shift_left : bunch_var -> bunch_var
+val var_shift_right : bunch_var -> bunch_var
 
 (* All of the fields are debug information *)
 
@@ -44,20 +51,25 @@ type kind =
     Star
   | Size
   | Sens
+  | Space
 
-(* Part 1: Sensitivites *)
+(* Sensitivities *)
+type p =
+  | PVar of list_var
+  | PConst of float
+  | PInfty
+
 type si =
-  (* Sizes *)
   | SiZero
   | SiSucc  of si
-  (* Reals *)
   | SiInfty
   | SiConst of float
-  | SiVar   of var_info
+  | SiVar   of list_var
   | SiAdd   of si * si
   | SiMult  of si * si
   | SiLub   of si * si
-  (* We only allow to sup the first variable *)
+  | SiLp    of si * si * p
+  (* We only allow to sup to happen over the first variable *)
   | SiSup   of binder_info * kind * si
   | SiCase  of si * si * binder_info * si
 
@@ -89,7 +101,7 @@ type ty_prim1 =
 
 type ty =
   (* variables used in bindings *)
-    TyVar  of var_info
+    TyVar  of list_var
 
   (* Primitive types *)
   | TyPrim  of ty_prim
@@ -97,17 +109,16 @@ type ty =
 
   (* ADT *)
   | TyUnion     of ty * ty
-  | TyTensor    of ty * ty
-  | TyAmpersand of ty * ty
+  | TyTensor    of ty * ty * p
 
   (* Functional type *)
-  | TyLollipop of ty * si * ty
+  | TyLollipop of ty * si * ty * p
 
   (* Fixpoint type *)
   | TyMu of binder_info * ty
 
   (* Quantified types *)
-  | TyForall     of binder_info * kind * ty
+  | TyForall of binder_info * kind * ty
   | TyExistsSize of binder_info * ty
 
   (********************************************************************)
@@ -144,13 +155,12 @@ type term_prim =
 val type_of_prim : term_prim -> ty
 
 type term =
-    TmVar of info * var_info
+    TmVar of info * bunch_var
 
   (*  *)
-  | TmPair      of info * term * term
-  (* | TmTensDest  of info * binder_info * binder_info * si * term * term *)
+  | TmPair      of info * term * term * p option
   | TmTensDest  of info * binder_info * binder_info * term * term
-
+  (* Remove the annotation *)
   | TmUnionCase of info * term * si * ty           * binder_info * term * binder_info * term
   (*                      t      [si] return ty of { inl(x)     => tm1  | inl(y)     => tm2  } *)
 
@@ -172,7 +182,7 @@ type term =
   | TmFold    of info * ty * term
   | TmUnfold  of info * term
 
-  (* Only needed for polymorphism *)
+  (* Only needed to avoid type inference *)
   | TmLet      of info * binder_info * si * term * term
   | TmLetRec   of info * binder_info * ty * term * term
   | TmSample   of info * binder_info * term * term
@@ -186,8 +196,8 @@ type term =
 
   (*                      t      return ty of {nil => tm1  | (    x     ::     xs      ) [si]       => tm2 } *)
   | TmListCase  of info * term * ty                 * term * binder_info * binder_info * binder_info * term
-  (*                      t      return ty of {Z   => tm1  | (S x)         [si]       => tm2 }                 *)
-  | TmNatCase   of info * term * ty                 * term * binder_info * binder_info * term
+  (*                      t      return ty of {Z => tm1  | (S x)         [si]       => tm2 }                 *)
+  | TmNatCase   of info * term * ty               * term * binder_info * binder_info * term
 
   (* Pack/Unpack *)
   | TmPack of info * term * si * ty

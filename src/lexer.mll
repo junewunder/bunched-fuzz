@@ -79,6 +79,7 @@ let reservedWords = [
   ("db_source", fun i -> Parser.DBSOURCE i);
   ("list", fun i -> Parser.LIST i);
   ("sens", fun i -> Parser.SENS i);
+  ("space", fun i -> Parser.SPACE i);
   ("size", fun i -> Parser.SIZE i);
   ("type", fun i -> Parser.TYPE i);
   ("pack", fun i -> Parser.PACK i);

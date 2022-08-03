@@ -54,7 +54,7 @@ let rec gen_term ppf t =
           | _           ->  fprintf ppf "%s" (ml_n v.v_name)
         end
     (* Will be represented as applications soon *)
-    | TmPair (_,  e1, e2) ->
+    | TmPair (_,  e1, e2, _) ->
       fprintf ppf "(%a, %a)" gen_term e1 gen_term e2
 
     | TmTensDest (_,  b_x, b_y, tm_e1, tm_e2) ->

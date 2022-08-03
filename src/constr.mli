@@ -15,7 +15,7 @@ type constr = {
   c_info     : info;
 
   (* Kinding context for the expressions *)
-  c_kind_ctx : kind ctx;
+  c_kind_ctx : kind list_ctx;
 
   (* List of equality constraints between size expressions. Intended
      invariant: all variables have kind Size under the kinding

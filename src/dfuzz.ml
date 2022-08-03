@@ -59,8 +59,12 @@ let parse file =
   let pi = Unix.in_channel_of_descr readme in
   let lexbuf = Lexer.create file pi in
   let program =
+    print_endline "hey";
     try Parser.body Lexer.main lexbuf
-    with Parsing.Parse_error -> error_msg Parser (Lexer.info lexbuf) "Parse error" in
+    with Parsing.Parse_error -> error_msg Parser (Lexer.info lexbuf) "Parse error"
+    (* | Parsing.MenhirBasics.Error -> _ *)
+    in
+  print_endline "hey";
   Parsing.clear_parser();
   close_in pi;
   program
@@ -68,7 +72,7 @@ let parse file =
 (* Main must be db_source -> fuzzy string *)
 let check_main_type ty =
   match ty with
-  | TyLollipop (TyPrim PrimDBS, _, TyPrim1 (Prim1Fuzzy, TyPrim PrimString)) -> ()
+  | TyLollipop (TyPrim PrimDBS, _, TyPrim1 (Prim1Fuzzy, TyPrim PrimString), _) -> ()
   | _ -> main_error dp "The type of the program must the db_source -o[?] fuzzy string"
 
 module WS = WhySolver

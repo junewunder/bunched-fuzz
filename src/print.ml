@@ -10,6 +10,7 @@
 open Format
 
 open Ctx
+open Bunch
 open Constr
 open Syntax
 
@@ -78,7 +79,13 @@ let rec pp_list pp fmt l = match l with
   | csx :: []  -> fprintf fmt "%a" pp csx
   | csx :: csl -> fprintf fmt "%a,@ %a" pp csx (pp_list pp) csl
 
-(* Not worth it, we usually need very custom printers in option cases *)
+let rec pp_bunch pp fmt b = match b with
+  | BEmpty -> fprintf fmt " - "
+  | BLeaf x -> fprintf fmt "%a" pp x
+  | BBranch (l, r, p) -> fprintf fmt "( %a ,[%f] %a )"
+    (pp_bunch pp) l
+    p
+    (pp_bunch pp) r
 
 (* let pp_option pp fmt o = match o with *)
 (*   | None   -> fprintf fmt "" *)
@@ -106,10 +113,11 @@ let pp_name fmt (bt, n) =
 
 let pp_vinfo fmt v =
   let vi = (v.v_type, v.v_name) in
-  match !debug_options.var_output with
+  fprintf fmt "%a" pp_name vi
+  (* match !debug_options.var_output with
       PrVarName  -> fprintf fmt "%a" pp_name vi
     | PrVarIndex -> fprintf fmt "[%d/%d]" v.v_index v.v_size
-    | PrVarBoth  -> fprintf fmt "%a:[%d/%d]" pp_name vi v.v_index v.v_size
+    | PrVarBoth  -> fprintf fmt "%a:[%d/%d]" pp_name vi v.v_index v.v_size *)
 
 let pp_binfo fmt b = pp_name fmt (b.b_type, b.b_name)
 
@@ -118,9 +126,20 @@ let pp_kind fmt k = match k with
     Star       -> fprintf fmt "*"
   | Size       -> fprintf fmt "%s" (u_sym Symbols.Nat)
   | Sens       -> fprintf fmt "%s" (u_sym Symbols.Num)
+  | Space      -> fprintf fmt "Lp-space"
 
 (**********************************************************************)
 (* Pretty printing for sensitivities *)
+
+let pp_p fmt p = match p with
+  | PVar v -> fprintf fmt "%s" v.v_name
+  | PConst f -> fprintf fmt "%f" f
+  | PInfty -> fprintf fmt "infty"
+let pp_op fmt p = match p with
+  | None -> fprintf fmt "-"
+  | Some PVar v -> fprintf fmt "%s" v.v_name
+  | Some PConst f -> fprintf fmt "%f" f
+  | Some PInfty -> fprintf fmt "infty"
 
 let rec pp_si fmt s =
   match s with
@@ -132,6 +151,7 @@ let rec pp_si fmt s =
   | SiMult(si1, si2)       -> fprintf fmt "(%a * %a)" pp_si si1 pp_si si2
   | SiInfty                -> fprintf fmt "%s" (u_sym Symbols.Inf)
   | SiLub  (s1, s2)        -> fprintf fmt "(%a @<1>%s %a)" pp_si s1 (u_sym Symbols.Lub) pp_si s2
+  | SiLp  (s1, s2, p)      -> fprintf fmt "L[%a](%a, %a)" pp_p p pp_si s1 pp_si s2
   | SiSup  (bi, k, s)      -> fprintf fmt "sup(%a : %a, %a)"  pp_binfo bi pp_kind k pp_si s
   | SiCase (s, s0, bi, sn) -> fprintf fmt "case(%a, %a, %a, %a)" pp_si s pp_si s0 pp_binfo bi pp_si sn
 
@@ -198,10 +218,9 @@ let rec pp_type ppf ty = match ty with
   | TyList (ty, si)         -> fprintf ppf "list(%a)[%a]" pp_type ty pp_si si
   (* ADT *)
   | TyUnion(ty1, ty2)       -> fprintf ppf "(%a @<1>%s @[<h>%a@])" pp_type ty1 (u_sym Symbols.Union)  pp_type ty2
-  | TyTensor(ty1, ty2)      -> fprintf ppf "(%a @<1>%s @[<h>%a@])" pp_type ty1 (u_sym Symbols.Tensor) pp_type ty2
-  | TyAmpersand(ty1, ty2)   -> fprintf ppf "(%a & @[<h>%a@])" pp_type ty1 pp_type ty2
+  | TyTensor(ty1, ty2, p)   -> fprintf ppf "(%a @<1>%s[%a] @[<h>%a@])" pp_type ty1 (u_sym Symbols.Tensor) pp_p p pp_type ty2
   (* Funs *)
-  | TyLollipop(ty1, s, ty2) -> fprintf ppf "(@[<hov>%a %a@ %a@])" pp_type ty1 pp_arrow s pp_type ty2
+  | TyLollipop(ty1, s, ty2, p) -> fprintf ppf "(@[<hov>%a %a@[%a] %a@])" pp_type ty1 pp_arrow s pp_p p pp_type ty2
   | TyMu(n, ty)             -> fprintf ppf "@<1>%s %a. @[<hov>(%a)@]" (u_sym Symbols.Mu) pp_binfo n pp_type ty
   (* Abs *)
   | TyForall(n, k, ty)      -> fprintf ppf "@<1>%s %a : %a.@;(@[%a@])" (u_sym Symbols.Forall) pp_binfo n pp_kind k pp_type ty
@@ -214,13 +233,13 @@ let pp_type_list = pp_list pp_type
 
 (* let pp_bi_ctx ppf ( *)
 
-let pp_var_ctx_elem ppf (v, ty) =
+let pp_var_ctx_elem ppf ((v : bunch_var), ty) =
   if !debug_options.full_context then
     fprintf ppf "%a : @[%a@]" pp_vinfo v pp_type ty
   else
     fprintf ppf "%a" pp_vinfo v
 
-let pp_var_ctx   = pp_list pp_var_ctx_elem
+let pp_var_ctx   = pp_bunch pp_var_ctx_elem
 
 (* Primitives to drop *)
 let n_prim = 37
@@ -230,7 +249,8 @@ let rec ldrop n l = if n = 0 then l else ldrop (n-1) (List.tl l)
 let pp_context ppf ctx =
   fprintf ppf "Type Context: [@[<v>%a@]]@\nTerm Context: [@[<v>%a@]@]"
     pp_tyvar_ctx (List.rev ctx.tyvar_ctx)
-    pp_var_ctx   (ldrop n_prim (List.rev ctx.var_ctx))
+    (* pp_var_ctx   (ldrop n_prim (List.rev ctx.var_ctx)) *)
+    pp_var_ctx ctx.var_ctx
 
 (**********************************************************************)
 (* Pretty printing for terms *)
@@ -302,7 +322,7 @@ let rec pp_term ppf t =
   | TmPrim(_, pt)           -> fprintf ppf "%s" (string_of_term_prim pt)
 
   (* Tensor and & *)
-  | TmPair(_, tm1, tm2)               -> fprintf ppf "(@[%a@], @[%a@])" pp_term tm1 pp_term tm2
+  | TmPair(_, tm1, tm2, p)               -> fprintf ppf "(@[%a@],[%a] @[%a@])" pp_term tm1 pp_op p pp_term tm2
   (* | TmTensDest(_, x, y, si, tm, term) -> fprintf ppf "@[<v>let (%a,%a) :[%a] = @[%a@];@,@[%a@]@]" pp_binfo x pp_binfo y pp_si si pp_term tm pp_term term *)
   | TmTensDest(_, x, y, tm, term) -> fprintf ppf "@[<v>let (%a,%a) : = @[%a@];@,@[%a@]@]" pp_binfo x pp_binfo y pp_term tm pp_term term
   | TmAmpersand(_, tm1, tm2)          -> fprintf ppf "(|@[%a@], @[%a@]|)" pp_term tm1 pp_term tm2

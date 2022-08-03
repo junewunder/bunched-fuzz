@@ -4,25 +4,39 @@
    LICENSE: 3-clause BSD style.
    See the LICENSE file for details on licensing.
 *)
+open Bunch
 open Syntax
 
 (* ---------------------------------------------------------------------- *)
 (* Context management *)
-
-(* Contexts of type 'a *)
-type 'a ctx = (var_info * 'a) list
-
 (* Term and type variables *)
 type context =
     {
-      var_ctx   : ty ctx;
-      tyvar_ctx : kind ctx;
+      var_ctx   : (bunch_var * ty) bunch;
+      tyvar_ctx : (list_var * kind) list;
       cs_ctx    : si_cs list;
     }
 
 let length ctx = List.length ctx
 
-let empty_context = { var_ctx = []; tyvar_ctx = []; cs_ctx = []; }
+let empty_context = { var_ctx = BEmpty; tyvar_ctx = []; cs_ctx = []; }
+
+let rec blookup id ctx = match ctx with
+  | BEmpty -> None
+  | BLeaf (var, value) ->
+    if var.v_name = id then
+        Some (var, value)
+      else
+        None
+  | BBranch (l, r, _) -> Option.(
+    let l = blookup id l in
+    let r = blookup id r in
+    (* if is_some l && is_some r then exit 0 *)
+    (* else *)
+    if is_some l then l
+    else if is_some r then r
+    else None
+  )
 
 (* Return a binding if it exists. Let the caller handle the error *)
 let rec slookup id ctx =
@@ -35,7 +49,7 @@ let rec slookup id ctx =
         slookup id l
 
 let lookup_var id ctx =
-  slookup id ctx.var_ctx
+  blookup id ctx.var_ctx
 
 let lookup_tyvar id ctx =
   slookup id ctx.tyvar_ctx
@@ -44,11 +58,11 @@ let lookup_tyvar id ctx =
 
 (* Shifting of bindings, this corresponds to a new type being introduced *)
 let varctx_ty_shift n d ctx =
-  List.map (fun (v, ty) -> (v, ty_shift n d ty)) ctx
+  Bunch.map (fun (v, ty) -> (v, ty_shift n d ty)) ctx
 
 (* Shifting of v_names, this is mostly for debug and corresponds to a new abstraction *)
-let varctx_var_shift n d ctx =
-  List.map (fun (v, ty) -> (var_shift n d v, ty)) ctx
+let varctx_var_shift ctx =
+  Bunch.map (fun (v, ty) -> (var_shift_left v, ty)) ctx
 
 (* When we introduce a type var, all variables of the type context
    must be shifted *)
@@ -59,17 +73,35 @@ let cs_ctx_shift n d =
   List.map (cs_shift n d)
 
 (* Extend the context with a new variable binding. We just shift term variables *)
-(* Really not needed, the variable index is just for debug purposes *)
-let extend_var id bi ctx =
-  let n_var = { (* dvi with *)
+let extend_var id bi ?(p=1.0) ctx =
+  let n_var = {
     v_name  = id;
     v_type  = BiVar;
-    v_index = 0;
-    v_size  = (length ctx.var_ctx) + 1;
+    v_index = PRight PHere;
+    v_size  = (Bunch.length ctx.var_ctx) + 1;
   } in
-  let s_ctx = varctx_var_shift 0 1 ctx.var_ctx in
+  let s_ctx = varctx_var_shift ctx.var_ctx in
   {
-    var_ctx   = (n_var, bi) :: s_ctx;
+    var_ctx   = BBranch (s_ctx, BLeaf (n_var, bi), p) ;
+    tyvar_ctx = ctx.tyvar_ctx ;
+    cs_ctx    = ctx.cs_ctx ;
+  }
+let extend_var2 id1 bi1 id2 bi2 ?(p=1.0) ?(q=1.0) ctx =
+  let n_var1 = {
+    v_name  = id1;
+    v_type  = BiVar;
+    v_index = PRight (PLeft PHere);
+    v_size  = (Bunch.length ctx.var_ctx) + 2;
+  } in
+  let n_var2 = {
+    v_name  = id2;
+    v_type  = BiVar;
+    v_index = PRight (PRight PHere);
+    v_size  = (Bunch.length ctx.var_ctx) + 2;
+  } in
+  let s_ctx = varctx_var_shift ctx.var_ctx in
+  {
+    var_ctx   = BBranch (s_ctx, BBranch (BLeaf (n_var1, bi1), BLeaf (n_var2, bi2), q), p) ;
     tyvar_ctx = ctx.tyvar_ctx ;
     cs_ctx    = ctx.cs_ctx ;
   }
@@ -77,7 +109,7 @@ let extend_var id bi ctx =
 (* Extend the context with a new binding. Return the new variable and
    the new context. *)
 let extend_ty_var id bi ctx =
-  let n_var = { (* dvi with *)
+  let n_var = {
     v_name = id;
     v_type = BiTyVar;
     v_index = 0;
@@ -96,7 +128,7 @@ let extend_ty_var id bi ctx =
 let extend_cs cs ctx =
   { ctx with cs_ctx = cs :: ctx.cs_ctx }
 
-let remove_first_var ctx =
+(* let remove_first_var ctx =
   if ctx.var_ctx = [] then
   (* We got no generated context, we are coming from a constant term *)
     ctx
@@ -106,7 +138,7 @@ let remove_first_var ctx =
       var_ctx   = List.tl s_ctx;
       tyvar_ctx = ctx.tyvar_ctx ;
       cs_ctx    = ctx.cs_ctx ;
-    }
+    } *)
 
 let remove_first_ty_var ctx =
   if ctx.tyvar_ctx = [] then
@@ -123,5 +155,5 @@ let remove_first_ty_var ctx =
     }
 
 (* Accessing to the variable in the context *)
-let access_var    ctx i = List.nth ctx.var_ctx   i
+let access_var ctx idx = Option.get @@ Bunch.index ctx.var_ctx idx
 let access_ty_var ctx i = List.nth ctx.tyvar_ctx i

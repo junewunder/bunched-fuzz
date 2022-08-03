@@ -5,6 +5,7 @@
    See the LICENSE file for details on licensing.
 *)
 open Support.FileInfo
+open Bunch
 
 (* ---------------------------------------------------------------------- *)
 (* Abstract Syntax Tree for sensitivities, terms and types                *)
@@ -24,32 +25,40 @@ type fuzz_binding =
    variables that in spirit should go in each particular case, for
    instance v_interesting make only sense for SiEvars ....
 *)
-type var_info = {
+type 'a var_info = {
   (* Indexes start a 0 *)
-  v_index : int;
+  v_index : 'a;
 
   (* Debug fields *)
   v_name  : string;
-  v_size  : int;
   v_type  : fuzz_binding;
+  v_size  : int;
 }
 
-(* Default varinfo *)
-let dvi = {
-  v_index       = -1;
+type list_var = int var_info
+type bunch_var = path var_info
+type 'a list_ctx = (list_var * 'a) list
+type 'a bunch_ctx = (bunch_var * 'a) bunch
 
-  v_name        = "deadbeef";
-  v_size        = -1;
-  v_type        = BiVar;
-}
 
 (* The name is printed on screen, but it is ignored for all purposes
 *)
 
 (* Helper to modify the index *)
-let var_shift o n v = { v with
+let var_shift o n (v : list_var) = {
+  v with
   v_index = if o <= v.v_index then v.v_index + n else v.v_index;
   v_size  = v.v_size  + n;
+}
+
+let var_shift_left v = {
+  v with
+  v_index = PLeft v.v_index;
+}
+
+let var_shift_right v = {
+  v with
+  v_index = PLeft v.v_index;
 }
 
 (* All of the fields are debug information *)
@@ -65,8 +74,14 @@ type kind =
     Star
   | Size
   | Sens
+  | Space
 
 (* Part 1: Sizes and Sensitivities *)
+
+type p =
+  | PVar of list_var
+  | PConst of float
+  | PInfty
 
 (* Sensitivities *)
 type si =
@@ -74,10 +89,11 @@ type si =
   | SiSucc  of si
   | SiInfty
   | SiConst of float
-  | SiVar   of var_info
+  | SiVar   of list_var
   | SiAdd   of si * si
   | SiMult  of si * si
   | SiLub   of si * si
+  | SiLp    of si * si * p
   (* We only allow to sup to happen over the first variable *)
   | SiSup   of binder_info * kind * si
   | SiCase  of si * si * binder_info * si
@@ -95,7 +111,8 @@ let rec si_map n f si =
   | SiMult (x, y)   -> SiMult(smf x, smf y)
   | SiInfty         -> SiInfty
   | SiLub  (s1, s2) -> SiLub (smf s1, smf s2)
-  | SiSup  (bi, k, s)      -> SiSup (bi, k, smb s)
+  | SiLp (s1, s2, p) -> SiLp (smf s1, smf s2, p)
+  | SiSup  (bi, k, s) -> SiSup (bi, k, smb s)
   | SiCase (s, s0, bi, sn) -> SiCase (smf s, smf s0, bi, smb sn)
 
 (* Shifts all the variables greater or equal than o by n *)
@@ -142,7 +159,7 @@ type ty_prim1 =
 (* Strings in the binders just for debug purposes *)
 type ty =
   (* variables used in bindings *)
-    TyVar  of var_info
+    TyVar  of list_var
 
   (* Primitive types *)
   | TyPrim  of ty_prim
@@ -150,11 +167,10 @@ type ty =
 
   (* ADT *)
   | TyUnion     of ty * ty
-  | TyTensor    of ty * ty
-  | TyAmpersand of ty * ty
+  | TyTensor    of ty * ty * p
 
   (* Functional type *)
-  | TyLollipop of ty * si * ty
+  | TyLollipop of ty * si * ty * p
 
   (* Fixpoint type *)
   | TyMu of binder_info * ty
@@ -182,10 +198,9 @@ let rec ty_map n fv fsi ty = match ty with
   | TyList (ty, sz)         -> TyList(ty_map n fv fsi  ty, fsi n sz)
   (* ADT *)
   | TyUnion(ty1, ty2)       -> TyUnion    (ty_map n fv fsi ty1, ty_map n fv fsi ty2)
-  | TyTensor(ty1, ty2)      -> TyTensor   (ty_map n fv fsi ty1, ty_map n fv fsi ty2)
-  | TyAmpersand(ty1, ty2)   -> TyAmpersand(ty_map n fv fsi ty1, ty_map n fv fsi ty2)
+  | TyTensor(ty1, ty2, p)      -> TyTensor   (ty_map n fv fsi ty1, ty_map n fv fsi ty2, p)
   (* *)
-  | TyLollipop(ty1, s, ty2) -> TyLollipop(ty_map n fv fsi ty1, fsi n s, ty_map n fv fsi ty2)
+  | TyLollipop(ty1, s, ty2, p) -> TyLollipop(ty_map n fv fsi ty1, fsi n s, ty_map n fv fsi ty2, p)
 
   | TyMu(b, ty)             -> TyMu(b, ty_map (n+1) fv fsi ty)
   (* *)
@@ -239,10 +254,10 @@ let type_of_prim t = match t with
   | PrimTDBS _      -> TyPrim PrimDBS
 
 type term =
-    TmVar of info * var_info
+    TmVar of info * bunch_var
 
   (*  *)
-  | TmPair      of info * term * term
+  | TmPair      of info * term * term * p option
   | TmTensDest  of info * binder_info * binder_info * term * term
   (* Remove the annotation *)
   | TmUnionCase of info * term * si * ty           * binder_info * term * binder_info * term
@@ -312,8 +327,8 @@ let rec map_term_ty_aux n ft fsi tm =
   | TmPrim(i, p)               -> TmPrim(i, map_prim_ty n ft p)
 
   (* Will die soon *)
-  | TmPair(i,      tm1,      tm2)    ->
-    TmPair(i, tf n tm1, tf n tm2)
+  | TmPair(i,      tm1,      tm2, p)    ->
+    TmPair(i, tf n tm1, tf n tm2, p)
 
   | TmTensDest(i, bi_x, bi_y,      tm,      tm_i) ->
     TmTensDest(i, bi_x, bi_y, tf n tm, tf n tm_i)
@@ -404,7 +419,7 @@ let tmInfo t = match t with
   | TmPrim(fi, _)              -> fi
 
   (* Will die soon *)
-  | TmPair(fi, _, _)           -> fi
+  | TmPair(fi, _, _, _)           -> fi
   (* | TmTensDest(fi,_,_,_,_,_)   -> fi *)
   | TmTensDest(fi,_,_,_,_)   -> fi
   | TmUnionCase(fi,_,_,_,_,_,_,_)-> fi

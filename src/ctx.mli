@@ -7,27 +7,26 @@
 open Syntax
 
 (* Contexts of type 'a *)
-type 'a ctx = (var_info * 'a) list
-
 type context =
-    {
-      var_ctx   : ty ctx;
-      tyvar_ctx : kind ctx;
+  {
+      var_ctx   : ty bunch_ctx;
+      tyvar_ctx : kind list_ctx;
       cs_ctx    : si_cs list;
     }
 
 val empty_context : context
 
-val extend_var   : string -> ty -> context -> context
+val extend_var   : string -> ty -> ?p:float -> context -> context
+val extend_var2   : string -> ty -> string -> ty -> ?p:float -> ?q:float -> context -> context
 val extend_ty_var : string -> kind -> context -> context
 val extend_cs : si_cs -> context -> context
 
-val remove_first_var   : context -> context
+(* val remove_first_var   : context -> context *)
 val remove_first_ty_var : context -> context
 
-val access_var    : context -> int -> var_info * ty
-val access_ty_var : context -> int -> var_info * kind
+val access_var    : context -> Bunch.path -> bunch_var * ty
+val access_ty_var : context -> int -> list_var * kind
 
 (* Name based functions for the parser *)
-val lookup_var   : string -> context -> (var_info * ty) option
-val lookup_tyvar : string -> context -> (var_info * kind) option
+val lookup_var   : string -> context -> (bunch_var * ty) option
+val lookup_tyvar : string -> context -> (list_var * kind) option

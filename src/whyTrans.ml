@@ -68,6 +68,7 @@ let why3_type kind = match kind with
   (* | Sens -> Ty.ty_app ts_rinf [] *)
   | Sens -> Ty.ty_real
   | Star -> why_error dp "Type in numeric formula?"
+  | Space -> Ty.ty_real
 
 let get_why3_sym th name =
   try WT.ns_find_ls th.WT.th_export [name]

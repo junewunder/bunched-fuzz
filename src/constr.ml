@@ -30,7 +30,7 @@ type constr = {
   c_info     : FI.info;
 
   (* Kinding context for the expressions *)
-  c_kind_ctx : kind ctx;
+  c_kind_ctx : kind list_ctx;
 
   (* List of equality constraints between size expressions. Intended
      invariant: all variables have kind Size under the kinding
@@ -159,6 +159,7 @@ module Optimize = struct
     | SiMult (si1, si2) -> is_standard si1 &&
                            is_standard si2
     | SiLub   _
+    | SiLp   _
     | SiSup   _
     | SiCase  _ -> false
 
