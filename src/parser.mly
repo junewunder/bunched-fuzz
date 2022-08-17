@@ -52,9 +52,9 @@ let rec qf_to_type qf ty = match qf with
   | (_, n, k) :: qfl -> TyForall(nb_tyvar n, k, qf_to_type qfl ty)
 
 let rec list_to_type l ret_ty = match l with
-    []                        -> TyLollipop (TyPrim PrimUnit, si_infty, ret_ty) (* Not yet allowed constant function *)
-  | (ty, si, _n, _i) :: []    -> TyLollipop (ty, si, ret_ty)
-  | (ty, si, _n, _i) :: tyl   -> TyLollipop (ty, si, list_to_type tyl ret_ty)
+    []                         -> TyLollipop (TyPrim PrimUnit, si_infty, ret_ty, PInfty) (* Not yet allowed constant function *)
+  | (ty, si, p, _n, _i) :: []  -> TyLollipop (ty, si, ret_ty, p)
+  | (ty, si, p, _n, _i) :: tyl -> TyLollipop (ty, si, list_to_type tyl ret_ty, p)
 
 let from_args_to_type qf arg_list ret_ty =
   qf_to_type qf (list_to_type arg_list ret_ty)
@@ -67,7 +67,7 @@ let rec qf_to_term qf tm = match qf with
 
 let rec list_to_term l body = match l with
     []                    -> body
-  | (ty, si, n, i) :: tml -> TmAbs (i, nb_var n, (si, ty), None, list_to_term tml body)
+  | (ty, si, p, n, i) :: tml -> TmAbs (i, nb_var n, (si, ty, p), None, list_to_term tml body)
 
 let from_args_to_term qf arg_list body =
   qf_to_term qf (list_to_term arg_list body)
@@ -171,6 +171,7 @@ let rec remove_quantifiers ty = match ty with
 %token <Support.FileInfo.info> STRING
 %token <Support.FileInfo.info> SIZE
 %token <Support.FileInfo.info> SENS
+%token <Support.FileInfo.info> SPACE
 %token <Support.FileInfo.info> TYPE
 %token <Support.FileInfo.info> PACK
 %token <Support.FileInfo.info> WITH
@@ -219,11 +220,11 @@ PrimSpec :
       { $1 }
 
 Term :
-    ID SensAnn EQUAL Expr SEMI Term
+    ID SensAnn EQUAL SpaceAnn Expr SEMI Term
       {
         fun ctx ->
           let ctx' = extend_var $1.v ctx in
-          TmLet($1.i, (nb_var $1.v), $2 ctx, $4 ctx, $6 ctx')
+          TmLet($1.i, (nb_var $1.v), $2 ctx, Some ($4 ctx), $5 ctx, $7 ctx')
       }
   /* | LET LPAREN ID COMMA ID RPAREN SensAnn EQUAL Expr SEMI Term */
   | LET LPAREN ID COMMA ID RPAREN EQUAL Expr SEMI Term
@@ -249,7 +250,7 @@ Term :
         let f_type           = from_args_to_type qf args ($6 ctx_args)             in
         let ctx_f_outer      = extend_var $2.v ctx                                 in
         let tm_prim          = TmPrim($8.i, PrimTFun($8.v, f_type))                in
-        TmLet($1, (nb_prim $2.v), si_infty, tm_prim, $10 ctx_f_outer)
+        TmLet($1, (nb_prim $2.v), si_infty, None, tm_prim, $10 ctx_f_outer)
       }
   | FUNCTION ID Quantifiers Arguments COLON Type LBRACE Term RBRACE Term
       {
@@ -262,25 +263,15 @@ Term :
 
         TmLetRec($2.i, nb_var $2.v, f_type, f_term, $10 ctx_let)
       }
-/*
-  | UNPACK SIZE LPAREN ID COMMA ID RPAREN EQUAL Expr SEMI Term
-      { fun ctx ->
-        let ctx' = extend_var $4.v ctx in
-        let ctx'' = extend_ty_var $6.v Size ctx' in
-        TmUnpack($1, nb_var $4.v, nb_tyvar $6.v, $9 ctx, $11 ctx'') }
-
-  | UNPACK SENS LPAREN ID COMMA ID RPAREN EQUAL Expr SEMI Term
-      { fun ctx ->
-        let ctx' = extend_var $4.v ctx in
-        let ctx'' = extend_ty_var $6.v Sens ctx' in
-        TmUnpack($1, nb_var $4.v, nb_tyvar $6.v, $9 ctx, $11 ctx'') }
-*/
   | LogOrTerm
       { $1 }
 
 Argument :
-    LPAREN ID COLON MaybeSensitivity Type RPAREN
-      { fun ctx -> ([($5 ctx, $4 ctx, $2.v, $2.i)], extend_var $2.v ctx) }
+    LPAREN ID COLON SpaceAnn MaybeSensitivity Type RPAREN
+      { fun ctx -> ([($6 ctx, $5 ctx, $4 ctx, $2.v, $2.i)], extend_var $2.v ctx) }
+// Argument :
+//     LPAREN ID COLON MaybeSensitivity SpaceAnn Type RPAREN
+//       { fun ctx -> ([($6 ctx, $4 ctx, $2.v, $2.i)], extend_var $2.v ctx) }
 
 /*
    Arguments returns a tuple of (arg, ctx), where arg is the list of
@@ -367,9 +358,10 @@ STerm :
       { fun ctx ->
         let if_then_spec = mk_prim_ty_app ctx $1 "if_then_else" [$5 ctx] in
         let arg_list    = [$2 ctx;
-                           TmAmpersand($6,
-                                       mk_lambda $7  (nb_var "thunk") (si_one, TyPrim PrimUnit) ($8  (extend_var "_" ctx)),
-                                       mk_lambda $11 (nb_var "thunk") (si_one, TyPrim PrimUnit) ($12 (extend_var "_" ctx)));] in
+                           TmPair($6,
+                                       mk_lambda $7  (nb_var "thunk") (si_one, TyPrim PrimUnit, PInfty) ($8  (extend_var "_" ctx)),
+                                       mk_lambda $11 (nb_var "thunk") (si_one, TyPrim PrimUnit, PInfty) ($12 (extend_var "_" ctx))
+                                , PInfty);] in
         mk_prim_app_args $1 if_then_spec (List.rev arg_list)
       }
 
@@ -429,10 +421,10 @@ TFExpr:
 
 /* Sugar for n-ary tuples */
 PairSeq:
-    Term COMMA Term
-      { fun ctx -> TmPair($2, $1 ctx, $3 ctx)  }
-  | Term COMMA PairSeq
-      { fun ctx -> TmPair($2, $1 ctx, $3 ctx)  }
+    Term COMMA SpaceAnn Term
+      { fun ctx -> TmPair($2, $1 ctx, $4 ctx, $3 ctx)  }
+  | Term COMMA SpaceAnn PairSeq
+      { fun ctx -> TmPair($2, $1 ctx, $4 ctx, $3 ctx)  }
 
 AExpr:
     TRUE
@@ -452,7 +444,7 @@ AExpr:
   | LPAREN PairSeq RPAREN
       { fun ctx -> $2 ctx }
   | LPAREN PIPE Term COMMA Term PIPE RPAREN
-      { fun ctx -> TmAmpersand($1, $3 ctx, $5 ctx) }
+      { fun ctx -> TmPair($1, $3 ctx, $5 ctx, PInfty) }
   | STRINGV
       { fun _cx -> TmPrim($1.i, PrimTString $1.v) }
   | FLOATV
@@ -480,6 +472,7 @@ SizeTerm :
                    | Star -> parser_error $1.i "Cannot bind a type variable in sensitivity"
                    | Sens -> parser_error $1.i "Cannot bind a sens variable in a size"
                    | Size -> (SiVar v)
+                   | Space -> parser_error $1.i "Cannot bind a space variable in a size"
       }
   | ZERO
       { fun _cx ->
@@ -505,12 +498,24 @@ SensAtomicTerm :
       { fun _cx -> SiConst $1.v }
 
 SensType :
-  | COLON MaybeSensitivity Type
-      { fun ctx -> ($2 ctx, $3 ctx) }
+  | COLON SpaceAnn MaybeSensitivity Type
+      { fun ctx -> ($3 ctx, $4 ctx, $2 ctx) }
 
 SensAnn :
   | COLON MaybeSensitivity
       { fun ctx -> $2 ctx }
+
+SpaceAnn :
+  | LBRACK ID RBRACK
+      { fun ctx -> let (v, k) = existing_tyvar $2.i $2.v ctx in
+                   match k with
+                   | Star -> parser_error $2.i "Cannot bind a type variable in space annotation"
+                   | _    -> PVar v
+      }
+  | LBRACK FLOATV RBRACK
+      { fun _cx -> PConst $2.v }
+  | LBRACK INF RBRACK
+      { fun _cx -> PInfty }
 
 MaybeSensitivity:
     /* nothing */
@@ -528,6 +533,8 @@ Kind :
       { Star }
   | SENS
       { Sens }
+  | SPACE
+      { Space }
 
 KindAnn :
     ID
@@ -571,13 +578,13 @@ Type :
 
 ComplexType :
     AType ARROW ComplexType
-      { fun ctx -> TyLollipop($1 ctx, si_infty, $3 ctx) }
+      { fun ctx -> TyLollipop($1 ctx, si_infty, $3 ctx, PInfty) }
   | AType ADD ComplexType
       { fun ctx -> TyUnion($1 ctx, $3 ctx) }
-  | AType LOLLIPOP ComplexType
-      { fun ctx -> TyLollipop($1 ctx, SiConst 1.0, $3 ctx) }
-  | AType LOLLIPOP LBRACK SensTerm RBRACK ComplexType
-      { fun ctx -> TyLollipop($1 ctx, $4 ctx, $6 ctx) }
+  | AType LOLLIPOP SpaceAnn ComplexType
+      { fun ctx -> TyLollipop($1 ctx, SiConst 1.0, $4 ctx, $3 ctx) }
+  | AType LOLLIPOP SpaceAnn LBRACK SensTerm RBRACK ComplexType
+      { fun ctx -> TyLollipop($1 ctx, $5 ctx, $7 ctx, $3 ctx) }
   | FUZZY Type
       { fun ctx -> TyPrim1 (Prim1Fuzzy, ($2 ctx)) }
   | LIST LPAREN Type RPAREN LBRACK SizeTerm RBRACK
@@ -586,10 +593,10 @@ ComplexType :
       { $1 }
 
 TPairSeq:
-    Type COMMA Type
-      { fun ctx -> TyTensor($1 ctx, $3 ctx) }
-  | Type COMMA TPairSeq
-      { fun ctx -> TyTensor($1 ctx, $3 ctx) }
+    Type COMMA SpaceAnn Type
+      { fun ctx -> TyTensor($1 ctx, $4 ctx, $3 ctx) }
+  | Type COMMA SpaceAnn TPairSeq
+      { fun ctx -> TyTensor($1 ctx, $4 ctx, $3 ctx) }
 
 AType :
     LPAREN Type RPAREN
@@ -615,4 +622,4 @@ AType :
   | LPAREN TPairSeq RPAREN
       { fun ctx -> $2 ctx }
   | LPAREN PIPE Type COMMA Type PIPE RPAREN
-      { fun ctx -> TyAmpersand($3 ctx, $5 ctx) }
+      { fun ctx -> TyTensor($3 ctx, $5 ctx, PInfty) }

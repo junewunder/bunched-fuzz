@@ -16,8 +16,8 @@ type context =
 
 val empty_context : context
 
-val extend_var   : string -> ty -> ?p:float -> context -> context
-val extend_var2   : string -> ty -> string -> ty -> ?p:float -> ?q:float -> context -> context
+val extend_var   : string -> ty -> ?p:p -> context -> context
+val extend_var2   : string -> ty -> string -> ty -> ?p:p -> ?q:p -> context -> context
 val extend_ty_var : string -> kind -> context -> context
 val extend_cs : si_cs -> context -> context
 

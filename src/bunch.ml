@@ -2,10 +2,15 @@
 exception BunchPathMatch
 
 (* BUNCHES *)
-type 'a bunch =
+type 'v p =
+  | PVar of 'v
+  | PConst of float
+  | PInfty
+
+type ('a, 'v) bunch =
   | BEmpty
   | BLeaf of 'a
-  | BBranch of 'a bunch * 'a bunch * float
+  | BBranch of ('a, 'v) bunch * ('a, 'v) bunch * 'v p
 
 let rec map f b = match b with
   | BEmpty -> BEmpty
@@ -52,10 +57,10 @@ let rec place_bunch b p x = match b, p with
 (* IDEA: can we use path's pointing to a BEmpty to replace bunch_partial? *)
 
 (* PARTIAL BUNCHES *)
-type 'a bunch_partial =
+type ('a, 'v) bunch_partial =
   | BPHole
-  | BPHoleLeft of 'a bunch_partial * 'a bunch * float
-  | BPHoleRight of 'a bunch * 'a bunch_partial * float
+  | BPHoleLeft of ('a, 'v) bunch_partial * ('a, 'v) bunch * 'v p
+  | BPHoleRight of ('a, 'v) bunch * ('a, 'v) bunch_partial * 'v p
 
 let rec fill_hole b x = match b with
   | BPHole -> BLeaf x

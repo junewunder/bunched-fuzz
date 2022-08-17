@@ -74,6 +74,15 @@ let u_sym x = Symbols.string_of_symbol x
 (**********************************************************************)
 (* Helper functions for pretty printing *)
 
+let pp_p fmt (p : Syntax.p) = match p with
+  | PVar v -> fprintf fmt "%s" v.v_name
+  | PConst f -> fprintf fmt "%f" f
+  | PInfty -> fprintf fmt "infty"
+
+let pp_op fmt (op : Syntax.p option) = match op with
+  | Some p -> pp_p fmt p
+  | None -> fprintf fmt "-"
+
 let rec pp_list pp fmt l = match l with
     []         -> fprintf fmt ""
   | csx :: []  -> fprintf fmt "%a" pp csx
@@ -82,9 +91,9 @@ let rec pp_list pp fmt l = match l with
 let rec pp_bunch pp fmt b = match b with
   | BEmpty -> fprintf fmt " - "
   | BLeaf x -> fprintf fmt "%a" pp x
-  | BBranch (l, r, p) -> fprintf fmt "( %a ,[%f] %a )"
+  | BBranch (l, r, p) -> fprintf fmt "( %a ,[%a] %a )"
     (pp_bunch pp) l
-    p
+    pp_p p
     (pp_bunch pp) r
 
 (* let pp_option pp fmt o = match o with *)
@@ -130,16 +139,6 @@ let pp_kind fmt k = match k with
 
 (**********************************************************************)
 (* Pretty printing for sensitivities *)
-
-let pp_p fmt p = match p with
-  | PVar v -> fprintf fmt "%s" v.v_name
-  | PConst f -> fprintf fmt "%f" f
-  | PInfty -> fprintf fmt "infty"
-let pp_op fmt p = match p with
-  | None -> fprintf fmt "-"
-  | Some PVar v -> fprintf fmt "%s" v.v_name
-  | Some PConst f -> fprintf fmt "%f" f
-  | Some PInfty -> fprintf fmt "infty"
 
 let rec pp_si fmt s =
   match s with
@@ -298,9 +297,9 @@ let pp_maybe_si_type ppf osity =
   else
     fprintf ppf ""
 
-let pp_si_type ppf (si, ty) =
+let pp_si_type ppf (si, ty, p) =
   if !debug_options.pr_ann then
-    fprintf ppf "%a %a" pp_colon si pp_type ty
+    fprintf ppf "%a %a %a" pp_colon si pp_type ty pp_p p
   else
     fprintf ppf ""
 
@@ -322,7 +321,7 @@ let rec pp_term ppf t =
   | TmPrim(_, pt)           -> fprintf ppf "%s" (string_of_term_prim pt)
 
   (* Tensor and & *)
-  | TmPair(_, tm1, tm2, p)               -> fprintf ppf "(@[%a@],[%a] @[%a@])" pp_term tm1 pp_op p pp_term tm2
+  | TmPair(_, tm1, tm2, p)               -> fprintf ppf "(@[%a@],[%a] @[%a@])" pp_term tm1 pp_p p pp_term tm2
   (* | TmTensDest(_, x, y, si, tm, term) -> fprintf ppf "@[<v>let (%a,%a) :[%a] = @[%a@];@,@[%a@]@]" pp_binfo x pp_binfo y pp_si si pp_term tm pp_term term *)
   | TmTensDest(_, x, y, tm, term) -> fprintf ppf "@[<v>let (%a,%a) : = @[%a@];@,@[%a@]@]" pp_binfo x pp_binfo y pp_term tm pp_term term
   | TmAmpersand(_, tm1, tm2)          -> fprintf ppf "(|@[%a@], @[%a@]|)" pp_term tm1 pp_term tm2
@@ -339,8 +338,8 @@ let rec pp_term ppf t =
 
   | TmApp(_, tm1, tm2)         -> print_special_app ppf tm1 tm2
 
-  | TmLet(_, n, si, tm1, tm2) ->
-    fprintf ppf "@[<v>@[<hov>%a @[:[%a]@] =@;<1 1>@[%a@]@];@,@[%a@]@]" pp_binfo n pp_si si pp_term tm1 pp_term tm2
+  | TmLet(_, n, si, p, tm1, tm2) ->
+    fprintf ppf "@[<v>@[<hov>%a @[:[%a]@] =@[[%a]@]@;<1 1>@[%a@]@];@,@[%a@]@]" pp_binfo n pp_si si pp_op p pp_term tm1 pp_term tm2
 
   | TmLetRec(_, n, r_ty, tm1, tm2) ->
     fprintf ppf "@[<v>@[<hov>rec %a : @[%a@] =@;<1 1>@[%a@]@];@,@[%a@]@]" pp_binfo n pp_type r_ty pp_term tm1 pp_term tm2

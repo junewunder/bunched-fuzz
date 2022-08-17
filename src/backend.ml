@@ -92,7 +92,7 @@ let rec gen_term ppf t =
     | TmAmpersand (_i, e1, e2) -> fprintf ppf "(%a,%a)" gen_term e1 gen_term e2
 
     (* let bi = e1 in e2 *)
-    | TmLet (_, bi, _si, e1, e2) ->
+    | TmLet (_, bi, _si, _p, e1, e2) ->
       begin
         match e1 with
         | TmPrim(_, PrimTFun(_, _)) -> gen_term ppf e2

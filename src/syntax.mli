@@ -28,7 +28,8 @@ type 'a var_info = {
 type list_var = int var_info
 type bunch_var = path var_info
 type 'a list_ctx = (list_var * 'a) list
-type 'a bunch_ctx = (bunch_var * 'a) bunch
+type 'a bunch_ctx = ((bunch_var * 'a), list_var) bunch
+type p = list_var Bunch.p
 
 (* Adds n to a var_info *)
 val var_shift : int -> int -> list_var -> list_var
@@ -54,11 +55,6 @@ type kind =
   | Space
 
 (* Sensitivities *)
-type p =
-  | PVar of list_var
-  | PConst of float
-  | PInfty
-
 type si =
   | SiZero
   | SiSucc  of si
@@ -158,7 +154,7 @@ type term =
     TmVar of info * bunch_var
 
   (*  *)
-  | TmPair      of info * term * term * p option
+  | TmPair      of info * term * term * p
   | TmTensDest  of info * binder_info * binder_info * term * term
   (* Remove the annotation *)
   | TmUnionCase of info * term * si * ty           * binder_info * term * binder_info * term
@@ -173,7 +169,7 @@ type term =
   | TmApp of info * term * term
 
   (* In a lambda is possible to independently annotate the input and return type *)
-  | TmAbs of info * binder_info * (si * ty) * ty option * term
+  | TmAbs of info * binder_info * (si * ty * p) * ty option * term
 
   (* & constructor *)
   | TmAmpersand of info * term * term
@@ -183,7 +179,7 @@ type term =
   | TmUnfold  of info * term
 
   (* Only needed to avoid type inference *)
-  | TmLet      of info * binder_info * si * term * term
+  | TmLet      of info * binder_info * si * p option * term * term
   | TmLetRec   of info * binder_info * ty * term * term
   | TmSample   of info * binder_info * term * term
 

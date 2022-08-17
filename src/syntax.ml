@@ -25,6 +25,7 @@ type fuzz_binding =
    variables that in spirit should go in each particular case, for
    instance v_interesting make only sense for SiEvars ....
 *)
+
 type 'a var_info = {
   (* Indexes start a 0 *)
   v_index : 'a;
@@ -38,7 +39,8 @@ type 'a var_info = {
 type list_var = int var_info
 type bunch_var = path var_info
 type 'a list_ctx = (list_var * 'a) list
-type 'a bunch_ctx = (bunch_var * 'a) bunch
+type 'a bunch_ctx = ((bunch_var * 'a), list_var) bunch
+type p = list_var Bunch.p
 
 
 (* The name is printed on screen, but it is ignored for all purposes
@@ -77,11 +79,6 @@ type kind =
   | Space
 
 (* Part 1: Sizes and Sensitivities *)
-
-type p =
-  | PVar of list_var
-  | PConst of float
-  | PInfty
 
 (* Sensitivities *)
 type si =
@@ -257,7 +254,7 @@ type term =
     TmVar of info * bunch_var
 
   (*  *)
-  | TmPair      of info * term * term * p option
+  | TmPair      of info * term * term * p
   | TmTensDest  of info * binder_info * binder_info * term * term
   (* Remove the annotation *)
   | TmUnionCase of info * term * si * ty           * binder_info * term * binder_info * term
@@ -272,7 +269,7 @@ type term =
   | TmApp of info * term * term
 
   (* In a lambda is possible to independently annotate the input and return type *)
-  | TmAbs of info * binder_info * (si * ty) * ty option * term
+  | TmAbs of info * binder_info * (si * ty * p) * ty option * term
 
   (* & constructor *)
   | TmAmpersand of info * term * term
@@ -282,7 +279,7 @@ type term =
   | TmUnfold  of info * term
 
   (* Only needed to avoid type inference *)
-  | TmLet      of info * binder_info * si * term * term
+  | TmLet      of info * binder_info * si * p option * term * term
   | TmLetRec   of info * binder_info * ty * term * term
   | TmSample   of info * binder_info * term * term
 
@@ -320,7 +317,7 @@ let map_prim_ty n f p =
 let rec map_term_ty_aux n ft fsi tm =
   let tf n = map_term_ty_aux n ft fsi                  in
   let opf  = Option.map (ft n)                         in
-  let psf = (fun (si, ty) -> (fsi n si, ft n ty))      in
+  let psf = (fun (si, ty, p) -> (fsi n si, ft n ty, p))      in
   (* let opsf = Option.map (fun (si, ty) -> (si, f n ty)) in *)
   match tm with
     TmVar(i, v)                -> TmVar (i, v)
@@ -350,8 +347,8 @@ let rec map_term_ty_aux n ft fsi tm =
     TmAmpersand(i, tf n tm1, tf n tm2)
 
   (*  *)
-  | TmLet(i, bi,       si,      tm,      tm_i)      ->
-    TmLet(i, bi, fsi n si, tf n tm, tf n tm_i)
+  | TmLet(i, bi,       si, p,      tm,      tm_i)      ->
+    TmLet(i, bi, fsi n si, p, tf n tm, tf n tm_i)
 
   | TmLetRec(i, bi,      ty,      tm,      tm_i) ->
     TmLetRec(i, bi, ft n ty, tf n tm, tf n tm_i)
@@ -431,7 +428,7 @@ let tmInfo t = match t with
   | TmAmpersand(fi,_,_)        -> fi
 
   (* Only needed for polymorphism *)
-  | TmLet(fi,_,_,_,_)          -> fi
+  | TmLet(fi,_,_,_,_,_)          -> fi
   | TmLetRec(fi,_,_,_,_)       -> fi
   | TmSample(fi,_,_,_)         -> fi
 

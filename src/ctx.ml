@@ -12,8 +12,8 @@ open Syntax
 (* Term and type variables *)
 type context =
     {
-      var_ctx   : (bunch_var * ty) bunch;
-      tyvar_ctx : (list_var * kind) list;
+      var_ctx   : ty bunch_ctx;
+      tyvar_ctx : kind list_ctx;
       cs_ctx    : si_cs list;
     }
 
@@ -73,7 +73,7 @@ let cs_ctx_shift n d =
   List.map (cs_shift n d)
 
 (* Extend the context with a new variable binding. We just shift term variables *)
-let extend_var id bi ?(p=1.0) ctx =
+let extend_var id bi ?(p=PConst 1.0) ctx =
   let n_var = {
     v_name  = id;
     v_type  = BiVar;
@@ -86,7 +86,7 @@ let extend_var id bi ?(p=1.0) ctx =
     tyvar_ctx = ctx.tyvar_ctx ;
     cs_ctx    = ctx.cs_ctx ;
   }
-let extend_var2 id1 bi1 id2 bi2 ?(p=1.0) ?(q=1.0) ctx =
+let extend_var2 id1 bi1 id2 bi2 ?(p=PConst 1.0) ?(q=PConst 1.0) ctx =
   let n_var1 = {
     v_name  = id1;
     v_type  = BiVar;

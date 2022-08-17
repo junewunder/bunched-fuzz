@@ -12,4 +12,4 @@
 (ocamllex lexer)
 (menhir
  (modules parser)
- (flags --unused-tokens))
+ (flags --unused-tokens --fixed-exception))

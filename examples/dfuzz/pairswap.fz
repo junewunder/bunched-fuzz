@@ -2,11 +2,3 @@ function id forall (p : space) (n :[p][2] num) : (num ,[p] num) {
   x:[] =[p] (n ,[p] n);
   x
 }
-
-function id (n :[3.0][2] num) : (num ,[3.0] num) {
-  x:[] =[3.0] (n ,[3.0] n);
-  x
-}
-
-id
-

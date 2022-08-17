@@ -30,6 +30,7 @@ type ty_error_elem =
 | WrongShape   of ty * string
 | WrongKind    of kind * kind
 | NotSubtype   of ty * ty
+| NotSubtypeP  of p * p
 | Internal     of string
 
 let ty_seq = ref 0
@@ -83,6 +84,15 @@ let with_new_ctx (f : context -> context) (m : 'a checker) : 'a checker =
 let fail (i : info) (e : ty_error_elem) : 'a checker = fun _ ->
   Left { i = i; v = e }
 
+let get_p_basis (i : info) (default : p option) : p checker =
+  let* ctx = get_ctx in
+  match ctx.var_ctx with
+  | BBranch (_, _, p) -> return p
+  | _ -> match default with
+    | Some p -> return p
+    | None -> fail i @@ Internal "cannot discern p basis"
+  (* TODO: print ctx *)
+
 let check_sens_leq i (sil : si) (sir : si) : unit checker =
   let* ctx = get_ctx in
   if post_si_leq i ctx sil sir then
@@ -107,9 +117,10 @@ let si_infty = SiInfty
    that doesn't have an assigned sensitivity, which must be
    later on. *)
 type bsi = si option
+type bsi_ctx = (bsi, list_var) bunch
 
 (* A list only with zero sensitivities *)
-let rec zeros (b : 'a bunch) : bsi bunch =
+let rec zeros b : bsi_ctx =
   match b with
   | BEmpty -> BEmpty
   | BLeaf _ -> BLeaf None
@@ -118,7 +129,7 @@ let rec zeros (b : 'a bunch) : bsi bunch =
 (* A list with zero sensitivities, except for one variable *)
 
 (* Note that this has to be kept in sync with the actual ctx *)
-let singleton (ctx : 'a bunch_ctx) (v : bunch_var) : bsi bunch =
+let singleton (ctx : 'a bunch_ctx) (v : bunch_var) : bsi_ctx =
   replace (zeros ctx) v.v_index (Some si_one)
 
 (* Extension of operations on regular sensitivities to augmented
@@ -134,6 +145,13 @@ let lp () (bsi1 : bsi) (bsi2 : bsi) : bsi =
 let add_bsi (bsi1 : bsi) (bsi2 : bsi) : bsi =
   match bsi1, bsi2 with
   | Some si1, Some si2 -> Some (SiAdd (si1, si2))
+  | Some si, None
+  | None, Some si -> Some si
+  | None, None -> None
+
+let contr_bsi (p : p) (bsi1 : bsi) (bsi2 : bsi) : bsi =
+  match bsi1, bsi2 with
+  | Some si1, Some si2 -> Some (SiLp (si1, si2, p))
   | Some si, None
   | None, Some si -> Some si
   | None, None -> None
@@ -174,6 +192,14 @@ module TypeSub = struct
     | _   when ty_f = ty_a -> return ()
     | _                    -> fail i @@ NotSubtype (TyPrim ty_f, TyPrim ty_a)
 
+  let check_p_sub (i : info) (p : p) (q : p) : unit checker =
+    let fail = fail i @@ NotSubtypeP (p, q) in
+    match p, q with
+    | PVar x, PVar y -> if x.v_index = y.v_index then return () else fail
+    | PConst f1, PConst f2 -> if f1 = f2 then return () else fail
+    | PInfty, PInfty -> return ()
+    | _ -> fail
+
   (* Check whether ty_1 is a subtype of ty_2, generating the necessary
      constraints along the way. *)
   let rec check_type_sub (i : info) (ty_1 : ty) (ty_2 : ty) : unit checker =
@@ -192,12 +218,12 @@ module TypeSub = struct
       check_type_sub i tyl2 tyr2
 
     | TyTensor(tyl1, tyl2, p), TyTensor(tyr1, tyr2, q) ->
-      if q != p then fail else
+      check_p_sub i p q >>
       check_type_sub i tyl1 tyr1 >>
       check_type_sub i tyl2 tyr2
 
     | TyLollipop(tyl1, sil, tyl2, p), TyLollipop(tyr1, sir, tyr2, q) ->
-      if q != p then fail else
+      check_p_sub i p q >>
       check_type_sub i tyr1 tyl1 >>
       check_type_sub i tyl2 tyr2 >>
       check_sens_leq i sir sil
@@ -327,9 +353,9 @@ let with_extended_ty_ctx (v : string) (k : kind) (m : 'a checker) : 'a checker =
    variable in the extended context. That list is destructed, and the
    result corresponding to the new variable is returned separately for
    convenience. *)
-let with_extended_ctx (i : info) (v : string) (ty : ty) (m : (ty * bsi bunch) checker) :
-    (ty * bsi * bsi bunch) checker =
-  let* (res, res_ext_ctx) = with_new_ctx (extend_var v ty) m in
+let with_extended_ctx (i : info) (v : string) (ty : ty) (p : p) (m : (ty * bsi_ctx) checker) :
+    (ty * bsi * bsi_ctx) checker =
+  let* (res, res_ext_ctx) = with_new_ctx (extend_var v ty ~p) m in
   match res_ext_ctx with
   | BBranch (res_ctx, BLeaf res_v, _) -> return (res, res_v, res_ctx)
   | _ -> fail i @@ Internal "Computation on extended context didn't produce enough results"
@@ -339,7 +365,7 @@ let with_extended_ctx (i : info) (v : string) (ty : ty) (m : (ty * bsi bunch) ch
    returned results matches those of the arguments. *)
 let with_extended_ctx_2 (i : info)
     (vx : string) (tyx : ty) (vy : string) (tyy : ty)
-    (m : ('a * 'b bunch) checker) : ('a * 'b * 'b * 'b bunch) checker =
+    (m : (ty * bsi_ctx) checker) : (ty * bsi * bsi * bsi_ctx) checker =
   let* (res, res_ext_ctx) = with_new_ctx (fun ctx -> extend_var2 vy tyy vx tyx ctx) m  in
   match res_ext_ctx with
   | BBranch (res_ctx, BBranch (BLeaf res_x, BLeaf res_y, _), _) -> return (res, res_x, res_y, res_ctx)
@@ -349,22 +375,22 @@ let get_var_ty (v : bunch_var) : ty checker =
   let* ctx = get_ctx in
   return @@ snd (access_var ctx v.v_index)
 
-let contr (bsis1 : bsi bunch) (bsis2 : bsi bunch) : bsi bunch =
+let contr (p : p) (bsis1 : bsi_ctx) (bsis2 : bsi_ctx) : bsi_ctx =
+  Bunch.map2 (contr_bsi p) bsis1 bsis2
+
+let add_sens (bsis1 : bsi_ctx) (bsis2 : bsi_ctx) : bsi_ctx =
   Bunch.map2 add_bsi bsis1 bsis2
 
-let add_sens (bsis1 : bsi bunch) (bsis2 : bsi bunch) : bsi bunch =
-  Bunch.map2 add_bsi bsis1 bsis2
-
-let scale_sens (bsi : bsi) (bsis : bsi bunch) : bsi bunch =
+let scale_sens (bsi : bsi) (bsis : bsi_ctx) : bsi_ctx =
   Bunch.map (mult_bsi bsi) bsis
 
-let lub_sens (bsis1 : bsi bunch) (bsis2 : bsi bunch) : bsi bunch =
+let lub_sens (bsis1 : bsi_ctx) (bsis2 : bsi_ctx) : bsi_ctx =
   Bunch.map2 lub_bsi bsis1 bsis2
 
-let sup_sens (bi : binder_info) (k : kind) (bsis : bsi bunch) : bsi bunch =
+let sup_sens (bi : binder_info) (k : kind) (bsis : bsi_ctx) : bsi_ctx =
   Bunch.map (sup_bsi bi k) bsis
 
-let case_sens (si : si) (bsis0 : bsi bunch) (bi : binder_info) (bsisn : bsi bunch) : bsi bunch =
+let case_sens (si : si) (bsis0 : bsi_ctx) (bi : binder_info) (bsisn : bsi_ctx) : bsi_ctx =
   Bunch.map2 (fun bsi0 bsin -> case_bsi si bsi0 bi bsin) bsis0 bsisn
 
 (**********************************************************************)
@@ -426,7 +452,7 @@ let rec kind_of (i : info) (si : si) : kind checker =
    satisfied in order for the type to be valid. Raises an error if it
    detects that no typing is possible. *)
 
-let rec type_of (t : term) : (ty * bsi bunch) checker  =
+let rec type_of (t : term) : (ty * bsi_ctx) checker  =
 
   ty_debug (tmInfo t) "--> [%3d] Enter type_of: @[%a@]" !ty_seq
     (Print.limit_boxes Print.pp_term) t; incr ty_seq;
@@ -448,15 +474,15 @@ let rec type_of (t : term) : (ty * bsi bunch) checker  =
     (* Abstraction and Application *)
 
     (* λ (x :[si] tya_x) : tya_tm { tm } *)
-    | TmAbs(i, b_x, (sia_x, tya_x), otya_tm, tm) ->
+    | TmAbs(i, b_x, (sia_x, tya_x, p), otya_tm, tm) ->
 
-      let* (ty_tm, si_x, sis) = with_extended_ctx i b_x.b_name tya_x (type_of tm) in
+      let* (ty_tm, si_x, sis) = with_extended_ctx i b_x.b_name tya_x p (type_of tm) in
 
       ty_debug (tmInfo t) "### [%3d] Inferred sensitivity for binder @[%a@] is @[%a@]" !ty_seq P.pp_binfo b_x P.pp_si (si_of_bsi si_x);
 
       check_type_ann i otya_tm ty_tm                    >>
         check_sens_leq i (si_of_bsi si_x) sia_x         >>
-        return (TyLollipop (tya_x, sia_x, ty_tm, PConst 1.0), sis)
+        return (TyLollipop (tya_x, sia_x, ty_tm, p), sis)
 
     (* tm1 !ᵢβ → α, tm2: β *)
     | TmApp(i, tm1, tm2) ->
@@ -478,29 +504,23 @@ let rec type_of (t : term) : (ty * bsi bunch) checker  =
     *)
 
     (* let x [: otya_x] = tm in e *)
-    | TmLet(i, x, sia_x, tm_x, e)  ->
+    | TmLet(i, x, sia_x, op, tm_x, e)  ->
 
+      let* p_basis = get_p_basis i op in
       let* (ty_x, sis_x)  = type_of tm_x in
 
       ty_info2 i "### Type of binder %a is %a" Print.pp_binfo x Print.pp_type ty_x;
 
-      let* (ty_e, si_x, sis_e) = with_extended_ctx i x.b_name ty_x (type_of e) in
+      let* (ty_e, si_x, sis_e) = with_extended_ctx i x.b_name ty_x p_basis (type_of e) in
       check_sens_leq i (si_of_bsi si_x) sia_x                 >>
-        return (ty_e, add_sens sis_e (scale_sens si_x sis_x))
+        return (ty_e, contr p_basis sis_e (scale_sens si_x sis_x))
 
     | TmLetRec(i, x, tya_x, tm_x, e) ->
 
-      let* (ty_x, _si_x, sis_x) = with_extended_ctx i x.b_name tya_x (type_of tm_x) in
-
-      (* XXX: Double check: before, this used to be backwards. *)
-      (* JH: LGTM *)
+      let* p_basis = get_p_basis i (Some (PConst 1.0)) in
+      let* (ty_x, _si_x, sis_x) = with_extended_ctx i x.b_name tya_x p_basis (type_of tm_x) in
       check_type_sub i ty_x tya_x >>
-
-      (* AAA: What happened here before seemed strange. We fed x into
-        e's context and assigned it a sensitivity of ∞. It seems that
-        this shouldn't be necessary, given that we are multiplying the
-        context by ∞ anyway... *)
-        let* (ty_e, si_x', sis_e) = with_extended_ctx i x.b_name tya_x (type_of e) in
+      let* (ty_e, si_x', sis_e) = with_extended_ctx i x.b_name tya_x p_basis (type_of e) in
 
       ty_info2 i "### Type of binder %a is %a" Print.pp_binfo x Print.pp_type ty_x;
       return (ty_e, add_sens sis_e (scale_sens (mult_bsi (Some si_infty) si_x') sis_x))
@@ -509,7 +529,7 @@ let rec type_of (t : term) : (ty * bsi bunch) checker  =
       let* ty_x, sis_x = type_of tm_x in
       let* ty_x = check_fuzz_shape i ty_x in
 
-      let* (ty_e, si_x, sis_e) = with_extended_ctx i b_x.b_name ty_x (type_of e) in
+      let* (ty_e, si_x, sis_e) = with_extended_ctx i b_x.b_name ty_x PInfty (type_of e) in
 
       ty_debug (tmInfo t) "### [%3d] Sample for binder @[%a@] with sens @[%a@]" !ty_seq P.pp_binfo b_x P.pp_si (si_of_bsi si_x);
 
@@ -545,12 +565,12 @@ let rec type_of (t : term) : (ty * bsi bunch) checker  =
       let tm'         = term_ty_subst 0 tdef_ty tm in
       type_of tm'
 
-    | TmPair(_i, e1, e2, op) ->
+    | TmPair(_i, e1, e2, p) ->
 
       let* (ty1, sis1) = type_of e1 in
       let* (ty2, sis2) = type_of e2 in
 
-      return @@ (TyTensor(ty1, ty2, Option.get op), add_sens sis1 sis2)
+      return @@ (TyTensor(ty1, ty2, p), add_sens sis1 sis2)
 
     (* let (x,y) = e in e' *)
     | TmTensDest(i, x, y, e, t) ->
@@ -590,10 +610,12 @@ let rec type_of (t : term) : (ty * bsi bunch) checker  =
 
       let* (ty1, ty2) = check_union_shape i ty_e in
 
-      let* (tyl, si_x, sis_l) = with_extended_ctx i b_x.b_name ty1 (type_of e_l) in
+      let* p_basis = get_p_basis i None in
+
+      let* (tyl, si_x, sis_l) = with_extended_ctx i b_x.b_name ty1 p_basis (type_of e_l) in
       check_type_sub i tyl ty >>
 
-        let* (tyr, si_y, sis_r) = with_extended_ctx i b_y.b_name ty2 (type_of e_r) in
+      let* (tyr, si_y, sis_r) = with_extended_ctx i b_y.b_name ty2 p_basis (type_of e_r) in
       check_type_sub i tyr ty >>
 
         let si_x = si_of_bsi si_x in
@@ -637,36 +659,41 @@ let rec type_of (t : term) : (ty * bsi bunch) checker  =
       (* EG: It wouldn't hurt, but I cannot see how it could slip. *)
 
       (* Case for Zero *)
-      with_new_ctx (cs_add_eq sz SiZero) begin
-        let* (ty_ztm, sis_ztm) = type_of ztm in
-        check_type_sub i ty_ztm ty >>
-        return (ty_ztm, sis_ztm)
-      end                          >>= fun (_ty_ztm, sis_ztm) ->
+      let* (_ty_ztm, sis_ztm) =
+        with_new_ctx (cs_add_eq sz SiZero) begin
+          let* (ty_ztm, sis_ztm) = type_of ztm in
+          check_type_sub i ty_ztm ty >>
+          return (ty_ztm, sis_ztm)
+        end
+      in
 
       (* Case for Succ n *)
-      with_extended_ty_ctx si.b_name Size begin
+      let* (_ty_stm, si_nat, sis_stm) =
+        with_extended_ty_ctx si.b_name Size begin
 
-        (* Get the newly introduced sens variable and create a term for it *)
-        let* ctx = get_ctx in
-        let (vi, _) = access_ty_var ctx 0 in
-        let sz'     = SiVar vi in
+          (* Get the newly introduced sens variable and create a term for it *)
+          let* ctx = get_ctx in
+          let (vi, _) = access_ty_var ctx 0 in
+          let sz'     = SiVar vi in
 
-        (* New variable of type Nat[n] *)
-        with_extended_ctx i nat.b_name (TySizedNat sz') begin
+          (* New variable of type Nat[n] *)
+          let* p_basis = get_p_basis i None in
+          with_extended_ctx i nat.b_name (TySizedNat sz') p_basis begin
 
-          (* NOTE: sz must be shifted, it comes from a smaller context *)
-          let sz_s = si_shift 0 1 sz in
+            (* NOTE: sz must be shifted, it comes from a smaller context *)
+            let sz_s = si_shift 0 1 sz in
 
-          with_new_ctx (cs_add_eq sz_s (SiSucc sz')) begin
-            let* (ty_stm, sis_stm) = type_of stm in
+            with_new_ctx (cs_add_eq sz_s (SiSucc sz')) begin
+              let* (ty_stm, sis_stm) = type_of stm in
 
-            (* Note: ty must be shifted! *)
-            let s_ty = ty_shift 0 1 ty in
-            check_type_sub i ty_stm s_ty    >>
-            return (ty_stm, sis_stm)
+              (* Note: ty must be shifted! *)
+              let s_ty = ty_shift 0 1 ty in
+              check_type_sub i ty_stm s_ty    >>
+              return (ty_stm, sis_stm)
+            end
           end
         end
-      end >>= fun (_ty_stm, si_nat, sis_stm) ->
+      in
 
       (* XXX: Review this *)
       return (ty, add_sens (case_sens sz sis_ztm si sis_stm)
@@ -760,6 +787,7 @@ let pp_tyerr ppf s = match s with
   | WrongShape(ty, sh)    -> fprintf ppf "EEE [%3d] Type %a has wrong shape, expected %s type." !ty_seq pp_type ty sh
   | WrongKind(k1, k2)     -> fprintf ppf "EEE [%3d] Kind mismatch expected %a found %a." !ty_seq pp_kind k1 pp_kind k2
   | NotSubtype(ty1,ty2)   -> fprintf ppf "EEE [%3d] %a is not a subtype of %a" !ty_seq pp_type ty1 pp_type ty2
+  | NotSubtypeP(p, q)     -> fprintf ppf "EEE [%3d] %a is not a subtype of %a" !ty_seq pp_p p pp_p q
   | Internal s            -> fprintf ppf "EEE [%3d] Internal error: %s" !ty_seq s
 
 (* Equivalent to run *)

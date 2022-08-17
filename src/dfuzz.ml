@@ -62,9 +62,7 @@ let parse file =
     print_endline "hey";
     try Parser.body Lexer.main lexbuf
     with Parsing.Parse_error -> error_msg Parser (Lexer.info lexbuf) "Parse error"
-    (* | Parsing.MenhirBasics.Error -> _ *)
     in
-  print_endline "hey";
   Parsing.clear_parser();
   close_in pi;
   program
