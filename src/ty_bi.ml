@@ -317,7 +317,7 @@ module TypeSub = struct
 
   let check_tensor_shape i ty =
     match ty with
-    | TyTensor(ty1, ty2, _) -> return (ty1, ty2)
+    | TyTensor(ty1, ty2, p) -> return (ty1, ty2, p)
     | _                  -> fail i @@ WrongShape (ty, "tensor")
 
   let check_union_shape i ty =
@@ -364,10 +364,11 @@ let with_extended_ctx (i : info) (v : string) (ty : ty) (p : p) (m : (ty * bsi_c
    the extended context, while vy has index 0. The order of the
    returned results matches those of the arguments. *)
 let with_extended_ctx_2 (i : info)
-    (vx : string) (tyx : ty) (vy : string) (tyy : ty)
+    (vx : string) (tyx : ty) (vy : string) (tyy : ty) (p : p)
     (m : (ty * bsi_ctx) checker) : (ty * bsi * bsi * bsi_ctx) checker =
-  let* (res, res_ext_ctx) = with_new_ctx (fun ctx -> extend_var2 vy tyy vx tyx ctx) m  in
-  match res_ext_ctx with
+  let* (res, res_ext_ctx) =
+    with_new_ctx (fun ctx -> extend_var2 vy tyy vx tyx ~p:p ~q:p ctx) m
+  in match res_ext_ctx with
   | BBranch (res_ctx, BBranch (BLeaf res_x, BLeaf res_y, _), _) -> return (res, res_x, res_y, res_ctx)
   | _ -> fail i @@ Internal "Computation on extended context didn't produce enough results"
 
@@ -461,7 +462,7 @@ let rec type_of (t : term) : (ty * bsi_ctx) checker  =
   ty_debug (tmInfo t) "<-- Context: @[%a@]" Print.pp_context ctx;
   let* ty, sis = match t with
     (* Variables *)
-    | TmVar(_i, v)  ->
+    | TmVar(_i, v) ->
       let* ctx = get_ctx in
       let* ty  = get_var_ty v in
       return (ty, singleton ctx.var_ctx v)
@@ -570,41 +571,26 @@ let rec type_of (t : term) : (ty * bsi_ctx) checker  =
       let* (ty1, sis1) = type_of e1 in
       let* (ty2, sis2) = type_of e2 in
 
-      return @@ (TyTensor(ty1, ty2, p), add_sens sis1 sis2)
+      return @@ (TyTensor(ty1, ty2, p), contr p sis1 sis2)
 
     (* let (x,y) = e in e' *)
     | TmTensDest(i, x, y, e, t) ->
 
+      ty_debug i "1aaaaaaaaaaaaaaaaa";
       let* (ty_e, sis_e) = type_of e in
-      (* JWTODO: check if p calue is correct here?? unclear *)
-      let* (ty_x, ty_y) = check_tensor_shape i ty_e in
-
+      ty_debug i "2aaaaaaaaaaaaaaaaa";
+      let* (ty_x, ty_y, p) = check_tensor_shape i ty_e in
+      ty_debug i "3aaaaaaaaaaaaaaaaa %a" Print.pp_term t;
       (* Extend context with x and y *)
-      let* (ty_t, si_x, si_y, sis_t) = with_extended_ctx_2 i x.b_name ty_x y.b_name ty_y (type_of t) in
+      let* (ty_t, si_x, si_y, sis_t) = with_extended_ctx_2 i x.b_name ty_x y.b_name ty_y p (type_of t) in
+      ty_debug i "4aaaaaaaaaaaaaaaaa";
 
       let si_x = si_of_bsi si_x in
       let si_y = si_of_bsi si_y in
 
-      return (ty_t, add_sens sis_t (scale_sens (Some (SiLub (si_x, si_y))) sis_e))
+      return (ty_t, contr p sis_t (scale_sens (Some (SiLub (si_x, si_y))) sis_e))
 
-    (* case e of inl(x) => e_l | inr(y) e_r *)
-    (* FIXME: Do we still need the sensitivity annotation on e? It's
-      being ignored right now. *)
-    (* JH: The paper has it in. We thought maybe we could remove the annotation,
-    * but it's not clear to me. Is it even being parsed yet? *)
-    (* AAA: Which paper? The case statement for nats in our ICFP
-      submission (which is the closest thing we have to sums there)
-      doesn't have any annotations, and the algorithm doesn't rely on
-      them. The parser *seems* to be reading some sensitivity
-      annotation for UNIONCASE. *)
-    (* FIXME: Since the paper doesn't formalize sums, I tried to guess
-      what the correct rule here would be. We should double-check this. *)
-    (* EG: Do we need a type anotation here? *)
-    (* AAA: I think so. We'll infer two types, one for each branch. We
-      could check that both are equal (i.e., t1 <= t2 and t2 <= t1),
-      but the resultning typing rule would be too restrictive, no? *)
-
-    | TmUnionCase(i, e, _sia_e, ty, b_x, e_l, b_y, e_r)      ->
+    | TmUnionCase(i, e, _sia_e, ty, b_x, e_l, b_y, e_r) ->
 
       let* (ty_e, sis_e) = type_of e in
 
@@ -728,7 +714,7 @@ let rec type_of (t : term) : (ty * bsi_ctx) checker  =
 
         (* We must shift the list types as we are under an extended context. *)
         let ty_e_s = ty_shift 0 1 ty_e' in
-        with_extended_ctx_2 i elem.b_name ty_e_s list.b_name (TyList (ty_e_s, sz')) begin
+        with_extended_ctx_2 i elem.b_name ty_e_s list.b_name (TyList (ty_e_s, sz')) (PConst 1.0) begin
 
           (* NOTE: sz must be shifted, it comes from a smaller context *)
           let sz_s = si_shift 0 1 sz in

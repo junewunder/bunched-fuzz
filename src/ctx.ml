@@ -155,5 +155,8 @@ let remove_first_ty_var ctx =
     }
 
 (* Accessing to the variable in the context *)
-let access_var ctx idx = Option.get @@ Bunch.index ctx.var_ctx idx
+let access_var ctx idx =
+  try Option.get @@ Bunch.index ctx.var_ctx idx
+  with Invalid_argument _ -> raise BunchPathMatch
+
 let access_ty_var ctx i = List.nth ctx.tyvar_ctx i

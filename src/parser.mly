@@ -37,6 +37,9 @@ let existing_tyvar fi id ctx =
 let extend_var id ctx =
   Ctx.extend_var id dummy_ty ctx
 
+let extend_var2 id1 id2 ctx =
+  Ctx.extend_var2 id1 dummy_ty id2 dummy_ty ctx
+
 let extend_ty_var id ki ctx =
   Ctx.extend_ty_var id ki ctx
 
@@ -229,9 +232,7 @@ Term :
   /* | LET LPAREN ID COMMA ID RPAREN SensAnn EQUAL Expr SEMI Term */
   | LET LPAREN ID COMMA ID RPAREN EQUAL Expr SEMI Term
       { fun ctx ->
-        (* TODO, what happens with let (x,x) = ...? *)
-        let ctx_x  = extend_var $3.v ctx   in
-        let ctx_xy = extend_var $5.v ctx_x in
+        let ctx_xy = extend_var2 $3.v $5.v ctx in
         TmTensDest($1, (nb_var $3.v), (nb_var $5.v), $8 ctx, $10 ctx_xy)
       }
   | SAMPLE ID EQUAL Expr SEMI Term

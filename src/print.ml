@@ -91,14 +91,15 @@ let rec pp_list pp fmt l = match l with
 let rec pp_bunch pp fmt b = match b with
   | BEmpty -> fprintf fmt " - "
   | BLeaf x -> fprintf fmt "%a" pp x
-  | BBranch (l, r, p) -> fprintf fmt "( %a ,[%a] %a )"
+  | BBranch (l, r, p) -> fprintf fmt "(@[%a@] ,[%a] @;@[%a@])"
     (pp_bunch pp) l
     pp_p p
     (pp_bunch pp) r
 
-(* let pp_option pp fmt o = match o with *)
-(*   | None   -> fprintf fmt "" *)
-(*   | Some v -> fprintf fmt "%a" pp v *)
+let rec pp_path fmt p = match p with
+  | PHere -> fprintf fmt "here"
+  | PLeft p -> fprintf fmt "left %a" pp_path p
+  | PRight p -> fprintf fmt "right %a" pp_path p
 
 (* Study this concept *)
 
@@ -217,7 +218,8 @@ let rec pp_type ppf ty = match ty with
   | TyList (ty, si)         -> fprintf ppf "list(%a)[%a]" pp_type ty pp_si si
   (* ADT *)
   | TyUnion(ty1, ty2)       -> fprintf ppf "(%a @<1>%s @[<h>%a@])" pp_type ty1 (u_sym Symbols.Union)  pp_type ty2
-  | TyTensor(ty1, ty2, p)   -> fprintf ppf "(%a @<1>%s[%a] @[<h>%a@])" pp_type ty1 (u_sym Symbols.Tensor) pp_p p pp_type ty2
+  | TyTensor(ty1, ty2, p)   -> fprintf ppf "(%a @<1>%s[%a] %a)" pp_type ty1 (u_sym Symbols.Tensor) pp_p p pp_type ty2
+  (* | TyTensor(ty1, ty2, p)   -> fprintf ppf "(%a @<1>%s[%a] @[<h>%a@])" pp_type ty1 (u_sym Symbols.Tensor) pp_p p pp_type ty2 *)
   (* Funs *)
   | TyLollipop(ty1, s, ty2, p) -> fprintf ppf "(@[<hov>%a %a@[%a] %a@])" pp_type ty1 pp_arrow s pp_p p pp_type ty2
   | TyMu(n, ty)             -> fprintf ppf "@<1>%s %a. @[<hov>(%a)@]" (u_sym Symbols.Mu) pp_binfo n pp_type ty

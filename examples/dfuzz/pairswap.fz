@@ -1,4 +1,12 @@
-function id forall (p : space) (n :[p][2] num) : (num ,[p] num) {
-  x:[] =[p] (n ,[p] n);
-  x
+function pairswap
+  forall (p : space)
+    (xy :[p][1] (num ,[p] num))
+    (zw :[p][1] (num ,[p] num))
+  : ((num ,[p] num) ,[p] (num ,[p] num))
+{
+  let (x, y) = xy;
+  let (z, w) = zw;
+  ((y ,[p] x) ,[p] (w ,[p] z))
 }
+
+pairswap
