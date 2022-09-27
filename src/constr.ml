@@ -158,10 +158,11 @@ module Optimize = struct
     | SiAdd  (si1, si2)
     | SiMult (si1, si2) -> is_standard si1 &&
                            is_standard si2
-    | SiLub   _
+    | SiRoot _
+    | SiLub  _
     | SiLp   _
-    | SiSup   _
-    | SiCase  _ -> false
+    | SiSup  _
+    | SiCase _ -> false
 
   (* Precondition: sir is standard *)
   let rec leq_simplify (cs : constr) : constr list =

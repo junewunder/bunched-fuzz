@@ -64,6 +64,7 @@ type si =
   | SiAdd   of si * si
   | SiMult  of si * si
   | SiLub   of si * si
+  | SiRoot  of p * si
   | SiLp    of si * si * p
   (* We only allow to sup to happen over the first variable *)
   | SiSup   of binder_info * kind * si

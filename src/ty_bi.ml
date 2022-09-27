@@ -424,6 +424,10 @@ let rec kind_of (i : info) (si : si) : kind checker =
     kind_of i y >>= ck >>
     return Sens
 
+  | SiRoot (_, x) ->
+    kind_of i x >>= ck >>
+    return Sens
+
   | SiLp (x, y, _) ->
     kind_of i x >>= ck >>
     kind_of i y >>= ck >>

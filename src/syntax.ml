@@ -90,6 +90,7 @@ type si =
   | SiAdd   of si * si
   | SiMult  of si * si
   | SiLub   of si * si
+  | SiRoot  of p * si
   | SiLp    of si * si * p
   (* We only allow to sup to happen over the first variable *)
   | SiSup   of binder_info * kind * si
@@ -108,6 +109,7 @@ let rec si_map n f si =
   | SiMult (x, y)   -> SiMult(smf x, smf y)
   | SiInfty         -> SiInfty
   | SiLub  (s1, s2) -> SiLub (smf s1, smf s2)
+  | SiRoot (p, s)   -> SiRoot (p, smf s)
   | SiLp (s1, s2, p) -> SiLp (smf s1, smf s2, p)
   | SiSup  (bi, k, s) -> SiSup (bi, k, smb s)
   | SiCase (s, s0, bi, sn) -> SiCase (smf s, smf s0, bi, smb sn)
