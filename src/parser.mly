@@ -251,7 +251,7 @@ Term :
         let f_type           = from_args_to_type qf args ($6 ctx_args)             in
         let ctx_f_outer      = extend_var $2.v ctx                                 in
         let tm_prim          = TmPrim($8.i, PrimTFun($8.v, f_type))                in
-        TmLet($1, (nb_prim $2.v), si_infty, None, tm_prim, $10 ctx_f_outer)
+        TmLet($1, (nb_prim $2.v), si_infty, Some PInfty, tm_prim, $10 ctx_f_outer)
       }
   | FUNCTION ID Quantifiers Arguments COLON Type LBRACE Term RBRACE Term
       {
@@ -270,9 +270,6 @@ Term :
 Argument :
     LPAREN ID COLON SpaceAnn MaybeSensitivity Type RPAREN
       { fun ctx -> ([($6 ctx, $5 ctx, $4 ctx, $2.v, $2.i)], extend_var $2.v ctx) }
-// Argument :
-//     LPAREN ID COLON MaybeSensitivity SpaceAnn Type RPAREN
-//       { fun ctx -> ([($6 ctx, $4 ctx, $2.v, $2.i)], extend_var $2.v ctx) }
 
 /*
    Arguments returns a tuple of (arg, ctx), where arg is the list of

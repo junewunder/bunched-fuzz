@@ -9,17 +9,17 @@
 */
 
 function kmeans
-  forall (i : size, j : size, e : sens)
-  (iters : nat[i])
-  (eps   : num[e])
-  (db    :[3 * i * e] (num, num) bag)
-  (centers : list((num, num))[j])
-  (iterate : (num[e]) -> ((num, num) bag) -o[3*e] (list((num, num))[j]) -> (fuzzy list((num, num))[j]))
-  : fuzzy list((num, num))[j] {
-    numcase iters of fuzzy list((num, num))[j] {
-        Z      => return centers
+  forall (i : size, j : size, e : sens, p : space)
+  (iters :[p][1] nat[i])
+  (eps   :[p][1] num[e])
+  (db    :[p][3 * i * e] (num,[p] num) bag)
+  (centers :[p][1] list((num,[p] num))[j])
+  (iterate :[p][1] (num[e]) -> ((num,[p] num) bag) -o[p][3*e] (list((num,[p] num))[j]) -> (fuzzy list((num,[p] num))[j]))
+  : fuzzy list((num,[p] num))[j] {
+    numcase iters of fuzzy list((num,[p] num))[j] {
+        Z      => return[p] centers
       | S n[n] =>
-        sample next_centers = kmeans[n][j][e] n eps db centers iterate;
+        sample next_centers = kmeans[n][j][e][p] n eps db centers iterate;
         iterate eps db next_centers
     }
   }

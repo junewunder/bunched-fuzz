@@ -1,0 +1,10 @@
+
+function foo (x : [2.0][1] num) (y : [2.0][1] num) : num {
+  op_add 2.0 x y
+}
+
+function bar (x :[2.0][1] num) : num {
+  foo x x
+}
+
+bar

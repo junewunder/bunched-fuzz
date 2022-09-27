@@ -1,0 +1,94 @@
+/* Copyright (c) 2013, The Trustees of the University of Pennsylvania
+   All rights reserved.
+
+   LICENSE: 3-clause BSD style.
+   See the LICENSE file for details on licensing.
+*/
+////////////////////////////////////////////////////////////////////////
+// Core primitives resulting from parser desugaring
+
+// Additive And
+primitive fst forall (p : space,A,B) (p :[p][] (| A, B |) ) : A { "_fst" }
+primitive snd forall (p : space,A,B) (p :[p][] (| A, B |) ) : B { "_snd" }
+
+// Additive or (inl inr are still keyworks because of their use in
+// pattern matching)
+
+primitive p_inl forall (p : space,A,B) (l :[p][] A) : (A + B) { "_inl" }
+primitive p_inr forall (p : space,A,B) (r :[p][] B) : (A + B) { "_inr" }
+
+// Infix operators
+primitive op_lor  forall (p : space) (op1 :[p] bool) (op2 :[p] bool) : bool { "_lor" }
+primitive op_land forall (p : space) (op1 :[p] bool) (op2 :[p] bool) : bool { "_land" }
+
+// Polymorphic equality (It was assumed in the old fuzz
+primitive op_eq   forall (p : space, A) (op1 :[p][] A) (op2 :[p][] A) : bool { "_eq" }
+
+// XXX: This should not be a primitive!
+primitive op_neq  forall (p : space, A) (op1 :[p][] bool) (op2 :[p][] bool) : bool { "_neq" }
+
+primitive op_lt   forall (p : space) (op1 :[p] num ) (op2 :[p] num ) : bool { "_lt" }
+primitive op_gt   forall (p : space) (op1 :[p] num ) (op2 :[p] num ) : bool { "_gt" }
+primitive op_lte  forall (p : space) (op1 :[p] num ) (op2 :[p] num ) : bool { "_lte" }
+primitive op_gte  forall (p : space) (op1 :[p] num ) (op2 :[p] num ) : bool { "_gte" }
+
+primitive op_add forall (p : space) (op1 :[p][] num ) (op2 :[p][] num ) : num { "_add" }
+primitive op_sub forall (p : space) (op1 :[p][] num ) (op2 :[p][] num ) : num { "_sub" }
+primitive op_mul forall (p : space) (op1 :[p] num ) (op2 :[p] num )     : num { "_mul" }
+primitive op_div forall (p : space) (op1 :[p] num ) (op2 :[p] num )     : num { "_div" }
+
+// Careful! Only sound if d >= 1.
+primitive op_ldiv forall (p : space) (d :[p] num ) (n :[p] num )     : num { "_ldiv" }
+
+primitive op_exp forall (p : space) (n :[p] num )                    : num { "_exp" }
+primitive op_abs forall (p : space) (n :[p] num )                    : num { "_abs" }
+
+// Integer primitives
+primitive op_iadd forall (p : space) (op1 :[p][] int ) (op2 :[p][] int ) : int { "_iadd" }
+primitive op_isub forall (p : space) (op1 :[p][] int ) (op2 :[p][] int ) : int { "_isub" }
+primitive op_imul forall (p : space) (op1 :[p] int ) (op2 :[p] int ) : int { "_imul" }
+primitive op_idiv forall (p : space) (op1 :[p] int ) (op2 :[p] int ) : int { "_idiv" }
+
+// Those will go away in DFuzz
+primitive clip forall (p : space) (n :[p][] num) : clipped                     { "clip" }
+
+// Fuzz is a core primitive now
+// primitive p_fuzz (epsilon : num) (n :[] num) : fuzzy num { "p_fuzz" }
+
+// Bounded iteration primitive:
+// primitive b_iter forall (A) (n : num) (f :[n] A -o[m] A) (elem :[n*m] A) : A
+
+////////////////////////////////////////////////////////////////////////
+// XXX: Move to lib, only "core" primitives should remain in this file
+// We don't support rationals in our grammar :/
+primitive div2 forall (p : space) (n :[p][0.5] num) : num { "div2" }
+primitive div3 forall (p : space) (n :[p][0.333] num) : num { "div3" }
+
+// Probability monad, return and bind
+primitive return   forall(p:space, A)   (x :[p] A)                              : fuzzy A { "_return" }
+primitive p_sample forall(p:space, A,B) (x :[p][] fuzzy A) (f :[p][] A -> fuzzy B) : fuzzy B { "_bind"   }
+
+primitive cswp forall (p : space) (t :[p][] (num,[p] num)) : (num,[p] num) { "cswp" }
+
+primitive num2string forall (p : space) (n :[p] num) : string { "num2string" }
+primitive string_concat forall (p : space) (s1 :[p] string) (s2 :[p] string) : string { "string_cc" }
+
+primitive if_then_else forall (p : space, A) (c :[p][] bool) (opts :[p][] (| () -o[p] A, () -o[p] A |)) : A { "_if_then_else" }
+
+////////////////////////////////////////////////////////////////////////
+// Parsing primitives:
+
+primitive parse_census forall (p : space) (dbs :[p][] db_source) : (num,[p] string,[p] string,[p] string,[p] num,[p] num,[p] num,[p] num) bag             { "parse_census" }
+primitive parse_apache forall (p : space) (dbs :[p][] db_source) : ((int,[p] int,[p] int,[p] int),[p] string) bag                                { "parse_apache" }
+primitive parse_points forall (p : space) (dbs :[p][] db_source) : (num,[p] num) bag                                                    { "parse_points" }
+primitive parse_student forall (p : space) (dbs:[p][] db_source) : (num,[p] string,[p] bool,[p] clipped,[p] bool,[p] clipped,[p] bool,[p] clipped) bag    { "parse_student" }
+primitive parse_queries forall (p : space) (dbs:[p][] db_source) : (clipped,[p] clipped,[p] clipped,[p] clipped,[p] clipped,[p] clipped,[p] clipped,[p] clipped) bag { "parse_queries" }
+
+////////////////////////////////////////////////////////////////////////
+// Dependent stuff
+// primitive zero (u : ())                   : nat[0] { "zero" }
+// primitive succ forall(i:size) (e: nat[i]) : nat[i+1] { "succ" }
+
+primitive nil  forall(p : space, A)         (u :[p] ())                      : list(A)[Z]   { "nil" }
+primitive cons forall(p : space, A, i:size) (e :[p][] A) (el :[p][] list(A)[i]) : list(A)[S i] { "cons" }
+

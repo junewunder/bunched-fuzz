@@ -576,14 +576,10 @@ let rec type_of (t : term) : (ty * bsi_ctx) checker  =
     (* let (x,y) = e in e' *)
     | TmTensDest(i, x, y, e, t) ->
 
-      ty_debug i "1aaaaaaaaaaaaaaaaa";
       let* (ty_e, sis_e) = type_of e in
-      ty_debug i "2aaaaaaaaaaaaaaaaa";
       let* (ty_x, ty_y, p) = check_tensor_shape i ty_e in
-      ty_debug i "3aaaaaaaaaaaaaaaaa %a" Print.pp_term t;
       (* Extend context with x and y *)
       let* (ty_t, si_x, si_y, sis_t) = with_extended_ctx_2 i x.b_name ty_x y.b_name ty_y p (type_of t) in
-      ty_debug i "4aaaaaaaaaaaaaaaaa";
 
       let si_x = si_of_bsi si_x in
       let si_y = si_of_bsi si_y in
@@ -596,7 +592,7 @@ let rec type_of (t : term) : (ty * bsi_ctx) checker  =
 
       let* (ty1, ty2) = check_union_shape i ty_e in
 
-      let* p_basis = get_p_basis i None in
+      let* p_basis = get_p_basis i (Some (PConst 1.0)) in
 
       let* (tyl, si_x, sis_l) = with_extended_ctx i b_x.b_name ty1 p_basis (type_of e_l) in
       check_type_sub i tyl ty >>

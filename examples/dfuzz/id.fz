@@ -1,12 +1,19 @@
-function id forall (p : space) (n :[p][2] num) : (num ,[p] num) {
-  x:[] =[p] (n ,[p] n);
-  x
+function id forall (p : space) (n :[p][1] num) : num {
+  n
 }
 
-function id (n :[3.0][2] num) : (num ,[3.0] num) {
-  x:[] =[3.0] (n ,[3.0] n);
-  x
+function id_tens
+  forall (p : space)
+    (xy :[p][1] (num ,[p] num))
+  : (num ,[p] num)
+{
+  let (x, y) = xy;
+  z:[] =[p] (x ,[p] y);
+  z
 }
 
-id
+(
+  id ,[1.0]
+  id_tens
+  )
 

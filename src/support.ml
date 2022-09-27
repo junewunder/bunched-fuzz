@@ -133,8 +133,11 @@ module Error = struct
       List.mem component !debug_options.components &&
       not (FileInfo.file_ignored fi) then
       begin
-	Format.eprintf "@[%s %s %a: @[" (level_to_string level) (comp_to_string component) FileInfo.pp_fileinfo fi;
-	Format.kfprintf (fun ppf -> Format.fprintf ppf "@]@]@.") Format.err_formatter
+        Format.eprintf "@[%s: @[" (comp_to_string component);
+        (* Format.eprintf "@[%s: @; @[" (comp_to_string component); *)
+        Format.kfprintf (fun ppf -> Format.fprintf ppf "@]@]@.") Format.err_formatter
+        (* Format.eprintf "@[%s %s %a: @[" (level_to_string level) (comp_to_string component) FileInfo.pp_fileinfo fi;
+        Format.kfprintf (fun ppf -> Format.fprintf ppf "@]@]@.") Format.err_formatter *)
       end
     else
       Format.ifprintf Format.err_formatter

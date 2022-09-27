@@ -49,7 +49,7 @@ function IDC
       | S n[n] =>
         sample approx = IDC[n][e] n eps db qs PA DUA eval_q;
         sample q      = PA qs approx db;
-	sample actual = add_noise[e] eps (eval_q q db);
+	      sample actual = add_noise[e] eps (eval_q q db);
         return (DUA approx q actual)
     }
   }
