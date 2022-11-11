@@ -6,6 +6,7 @@
    See the LICENSE file for details on licensing.
 *)
 
+module P = Why3.Pretty
 module WC = WhyCore
 module WT = WhyTrans
 
@@ -32,7 +33,7 @@ let why_debug3  fi   = message 6 Opts.SMT fi
 
 (* We will likely borrow the EC implementation for this file *)
 
-let alt_ergo : Whyconf.config_prover =
+(* let alt_ergo : Whyconf.config_prover =
   let fp = Whyconf.parse_filter_prover "Alt-Ergo"   in
   (* all provers that have the name "Alt-Ergo" *)
   let provers = Whyconf.filter_provers WC.config fp in
@@ -55,15 +56,41 @@ let alt_ergo_driver : Driver.driver =
   with e ->
     Format.eprintf "Failed to load driver for alt-ergo: %a@."
       Exn_printer.exn_printer e;
+    exit 1 *)
+
+let z3 : Whyconf.config_prover =
+  let fp = Whyconf.parse_filter_prover "Z3"   in
+  let provers = Whyconf.filter_provers WC.config fp in
+  if Whyconf.Mprover.is_empty provers then begin
+    Format.eprintf "provers empty: %b@." @@ Whyconf.Mprover.is_empty @@ Whyconf.get_provers WC.config;
+    List.iter
+      (fun p -> print_endline (Whyconf.get_complete_command p ~with_steps:false))
+      (Whyconf.Mprover.values @@ Whyconf.get_provers WC.config);
+    print_endline @@ Whyconf.get_conf_file WC.config;
+    Format.eprintf "Prover Z3 not installed or not configured@.";
+    exit 0
+  end else
+    snd (Whyconf.Mprover.max_binding provers)
+
+(* loading the Z3 driver *)
+let z3_driver : Driver.driver =
+  try
+    Whyconf.load_driver WC.main WC.env z3
+  with e ->
+    Format.eprintf "Failed to load driver for z3: %a@."
+      Exn_printer.exn_printer e;
     exit 1
 
 let post cs =
+  why_info UNKNOWN "cs=%a" P.print_term cs;
   let task    = None                                                   in
   let goal_id = Decl.create_prsymbol (Ident.id_fresh "ty_goal")        in
   let task    = Task.use_export task WT.int_theory                     in
   (* let task    = Task.use_export task WT.dfuzz_i_theory                 in *)
   let task    = Task.use_export task WT.real_theory                    in
   let task    = Task.use_export task WT.dfuzz_theory                   in
+  let task    = Task.use_export task WT.pow_theory                     in
+  let task    = Task.use_export task WT.minmax_theory                  in
   (* let task    = Task.use_export task WT.fin_theory                     in *)
   (* let task    = Task.use_export task WT.list_theory                    in *)
   (* let task    = Task.use_export task WT.exp_theory                     in *)
@@ -80,15 +107,15 @@ let post cs =
     Call_provers.wait_on_call (
       Driver.prove_task
         ~limit:CP.empty_limit
-        ~command:alt_ergo.Whyconf.command
+        ~command:z3.Whyconf.command
         ~libdir
         ~datadir
-  	    alt_ergo_driver
+  	    z3_driver
         task
       )
   in
 
-  why_info dp "@[alt-ergo answers %a@]@." (Call_provers.print_prover_result ?json:None) result;
+  why_info dp "@[solver answers %a@]@." (Call_provers.print_prover_result ?json:None) result;
   match result.CP.pr_answer with
   | CP.Valid   -> true
   | CP.Invalid -> false

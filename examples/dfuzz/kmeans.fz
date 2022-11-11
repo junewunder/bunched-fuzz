@@ -5,24 +5,39 @@
    - None.
 
    Missing functions:
+   TODO JUNE: IMPLEMENT ITERATE
    - iterate
+*/
+
+/*
+function iterate
+  forall (e : sens, p : space)
+
+(num[e]) -> ((num,[p] num) bag) -o[p][3*e] (list((num,[p] num))[j]) -> (fuzzy list((num,[p] num))[j])
 */
 
 function kmeans
   forall (i : size, j : size, e : sens, p : space)
   (iters :[p][1] nat[i])
-  (eps   :[p][1] num[e])
-  (db    :[p][3 * i * e] (num,[p] num) bag)
-  (centers :[p][1] list((num,[p] num))[j])
-  (iterate :[p][1] (num[e]) -> ((num,[p] num) bag) -o[p][3*e] (list((num,[p] num))[j]) -> (fuzzy list((num,[p] num))[j]))
+  (eps   :[p][inf] num[e])
+  (db    :[p][root[p](3) * i * e] (num,[p] num) bag)
+  (centers :[p][inf] list((num,[p] num))[j])
+  (iterate :[p][i]
+    (num[e]) ->
+    ((num,[p] num) bag) -o[p][root[p](3)*e]
+    (list((num,[p] num))[j]) ->
+    (fuzzy list((num,[p] num))[j])
+  )
   : fuzzy list((num,[p] num))[j] {
     numcase iters of fuzzy list((num,[p] num))[j] {
         Z      => return[p] centers
-      | S n[n] =>
-        sample next_centers = kmeans[n][j][e][p] n eps db centers iterate;
+      | S n[ii] =>
+        sample next_centers = kmeans[ii][j][e][p] n eps db centers iterate;
         iterate eps db next_centers
     }
   }
+
+/*root[3]((i-1)e) + root[3](e) <= root[3](i*e)*/
 
 kmeans
 

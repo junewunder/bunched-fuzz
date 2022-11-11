@@ -179,7 +179,9 @@ let pp_ctx_eq =
   pp_list pp_si_eq
 
 let pp_cs fmt cs =
-  fprintf fmt "@[<h>%a@] | @[<h>%a@] %s @[%a@] %s @[%a@]" pp_tyvar_ctx cs.c_kind_ctx
+  fprintf fmt "%a @[<h>%a@] | @[<h>%a@] %s @[%a@] %s @[%a@]"
+    Support.FileInfo.pp_fileinfo cs.c_info
+    pp_tyvar_ctx cs.c_kind_ctx
     pp_ctx_eq cs.c_cs (u_sym Symbols.Vdash)
     pp_si cs.c_upper (u_sym Symbols.Geq) pp_si cs.c_lower
 
