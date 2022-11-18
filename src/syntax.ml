@@ -20,6 +20,7 @@ type fuzz_binding =
     BiVar    (* Regular varible *)
   | BiTyVar  (* Type variable   *)
   | BiETyVar (* Existential variable  *)
+[@@deriving show]
 
 (* To keep things simple, we include some meta-information about
    variables that in spirit should go in each particular case, for
@@ -35,12 +36,22 @@ type 'a var_info = {
   v_type  : fuzz_binding;
   v_size  : int;
 }
+[@@deriving show]
 
 type list_var = int var_info
+[@@deriving show]
+
 type bunch_var = path var_info
+[@@deriving show]
+
 type 'a list_ctx = (list_var * 'a) list
+[@@deriving show]
+
 type 'a bunch_ctx = ((bunch_var * 'a), list_var) bunch
+[@@deriving show]
+
 type p = list_var Bunch.p
+[@@deriving show]
 
 
 (* The name is printed on screen, but it is ignored for all purposes
@@ -70,6 +81,7 @@ type binder_info = {
   b_type : fuzz_binding;
   b_prim : bool;
 }
+[@@deriving show]
 
 (* Kinds for type variables *)
 type kind =
@@ -77,6 +89,7 @@ type kind =
   | Size
   | Sens
   | Space
+[@@deriving show]
 
 (* Part 1: Sizes and Sensitivities *)
 
@@ -95,6 +108,7 @@ type si =
   (* We only allow to sup to happen over the first variable *)
   | SiSup   of binder_info * kind * si
   | SiCase  of si * si * binder_info * si
+[@@deriving show]
 
 (* Map over the variables of a sensitivity type *)
 let rec si_map n f si =
@@ -131,7 +145,7 @@ let si_subst_shift x t n v =
 let si_subst x t si =
   si_map 0 (si_subst_shift x t) si
 
-type si_cs = SiEq of (si * si)
+type si_cs = SiEq of (si * si) [@@deriving show]
 
 let cs_shift n d cs = match cs with
   | SiEq (s1, s2) -> SiEq (si_shift n d s1, si_shift n d s2)
@@ -147,6 +161,7 @@ type ty_prim =
   | PrimString
   | PrimClipped
   | PrimDBS
+[@@deriving show]
 
 (* Types with one argument *)
 (* XXX: Extend to types with n-ary arguments *)
@@ -154,6 +169,7 @@ type ty_prim1 =
     Prim1Set
   | Prim1Bag
   | Prim1Fuzzy
+[@@deriving show]
 
 (* Strings in the binders just for debug purposes *)
 type ty =
@@ -183,7 +199,7 @@ type ty =
   | TySizedNat of si
   | TySizedNum of si
   | TyList     of ty * si
-
+[@@deriving show]
 
 (* map over types, first argument: action on vars, second argument
    action on evars, third argument action on sensitivities, 4th on sizes *)
@@ -242,6 +258,7 @@ type term_prim =
   | PrimTString of string
   | PrimTFun    of string * ty
   | PrimTDBS    of string
+  [@@deriving show]
 
 let type_of_prim t = match t with
     PrimTUnit       -> TyPrim PrimUnit
@@ -305,6 +322,7 @@ type term =
   | TmTyAbs of info * binder_info * kind * term
   | TmSiApp of info * term * si
   | TmTyApp of info * term * ty
+  [@@deriving show]
 
 let map_prim_ty n f p =
   match p with

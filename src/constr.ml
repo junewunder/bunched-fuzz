@@ -44,6 +44,7 @@ type constr = {
   (* The bigger side in the inequality *)
   c_upper : si;
 }
+[@@deriving show]
 
 (* XXX: constr is redundant with ctx, we should fix that *)
 let cs_ctx_shift n d =

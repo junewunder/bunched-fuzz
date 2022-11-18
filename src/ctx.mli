@@ -12,7 +12,7 @@ type context =
       var_ctx   : ty bunch_ctx;
       tyvar_ctx : kind list_ctx;
       cs_ctx    : si_cs list;
-    }
+    } [@@deriving show]
 
 val empty_context : context
 

@@ -6,11 +6,13 @@ type 'v p =
   | PVar of 'v
   | PConst of float
   | PInfty
+[@@deriving show]
 
 type ('a, 'v) bunch =
   | BEmpty
   | BLeaf of 'a
   | BBranch of ('a, 'v) bunch * ('a, 'v) bunch * 'v p
+[@@deriving show]
 
 let rec map f b = match b with
   | BEmpty -> BEmpty
@@ -34,6 +36,7 @@ type path =
   | PHere
   | PLeft of path
   | PRight of path
+[@@deriving show]
 
 let rec index b p = match b, p with
   | BEmpty, PHere -> None
@@ -61,6 +64,7 @@ type ('a, 'v) bunch_partial =
   | BPHole
   | BPHoleLeft of ('a, 'v) bunch_partial * ('a, 'v) bunch * 'v p
   | BPHoleRight of ('a, 'v) bunch * ('a, 'v) bunch_partial * 'v p
+[@@deriving show]
 
 let rec fill_hole b x = match b with
   | BPHole -> BLeaf x

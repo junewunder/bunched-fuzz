@@ -28,6 +28,7 @@ type constr = {
   (* The bigger side in the inequality *)
   c_upper : si;
 }
+[@@deriving show]
 
 (* Convenience wrapper around constr *)
 val mk_constr_leq : info -> context -> si -> si -> constr

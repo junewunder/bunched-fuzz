@@ -16,6 +16,7 @@ type context =
       tyvar_ctx : kind list_ctx;
       cs_ctx    : si_cs list;
     }
+[@@deriving show]
 
 let length ctx = List.length ctx
 

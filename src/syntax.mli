@@ -12,6 +12,7 @@ type fuzz_binding =
     BiVar    (* Regular varible *)
   | BiTyVar  (* Type variable   *)
   | BiETyVar (* Existential variable  *)
+[@@deriving show]
 
 (* Variables and binders *)
 type 'a var_info = {
@@ -22,14 +23,14 @@ type 'a var_info = {
   v_name  : string;
   v_type  : fuzz_binding;
   v_size  : int;
-}
+} [@@deriving show]
 
 (* Contexts of type 'a *)
-type list_var = int var_info
-type bunch_var = path var_info
-type 'a list_ctx = (list_var * 'a) list
-type 'a bunch_ctx = ((bunch_var * 'a), list_var) bunch
-type p = list_var Bunch.p
+type list_var = int var_info [@@deriving show]
+type bunch_var = path var_info [@@deriving show]
+type 'a list_ctx = (list_var * 'a) list [@@deriving show]
+type 'a bunch_ctx = ((bunch_var * 'a), list_var) bunch [@@deriving show]
+type p = list_var Bunch.p [@@deriving show]
 
 (* Adds n to a var_info *)
 val var_shift : int -> int -> list_var -> list_var
@@ -43,7 +44,7 @@ type binder_info = {
   b_size : int;          (* How many outside binders we had when this binded was found *)
   b_type : fuzz_binding;
   b_prim : bool;
-}
+} [@@deriving show]
 
 (* Types *)
 
@@ -53,6 +54,7 @@ type kind =
   | Size
   | Sens
   | Space
+  [@@deriving show]
 
 (* Sensitivities *)
 type si =
@@ -69,11 +71,12 @@ type si =
   (* We only allow to sup to happen over the first variable *)
   | SiSup   of binder_info * kind * si
   | SiCase  of si * si * binder_info * si
+  [@@deriving show]
 
 (* Shift variable indexes by n *)
 val si_shift : int -> int -> si -> si
 
-type si_cs = SiEq of (si * si)
+type si_cs = SiEq of (si * si) [@@deriving show]
 
 val cs_shift : int -> int -> si_cs -> si_cs
 
@@ -88,6 +91,7 @@ type ty_prim =
   | PrimString
   | PrimClipped
   | PrimDBS
+  [@@deriving show]
 
 (* Types with one argument *)
 (* XXX: Extend to types with n-ary arguments *)
@@ -95,6 +99,7 @@ type ty_prim1 =
     Prim1Set
   | Prim1Bag
   | Prim1Fuzzy
+  [@@deriving show]
 
 type ty =
   (* variables used in bindings *)
@@ -123,6 +128,7 @@ type ty =
   | TySizedNat of si
   | TySizedNum of si
   | TyList     of ty * si
+  [@@deriving show]
 
 (* XXX: This is incorrect, right now it shifts all the indexes, thus
    it is buggy, see the other comment *)
@@ -148,6 +154,7 @@ type term_prim =
   | PrimTString of string
   | PrimTFun    of string * ty
   | PrimTDBS    of string
+  [@@deriving show]
 
 val type_of_prim : term_prim -> ty
 
@@ -204,6 +211,7 @@ type term =
   | TmTyAbs of info * binder_info * kind * term
   | TmSiApp of info * term * si
   | TmTyApp of info * term * ty
+  [@@deriving show]
 
 val tmInfo : term -> info
 

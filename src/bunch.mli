@@ -4,11 +4,13 @@ type 'v p =
   | PVar of 'v
   | PConst of float
   | PInfty
+  [@@deriving show]
 
 type ('a, 'v) bunch =
   | BEmpty
   | BLeaf of 'a
   | BBranch of ('a, 'v) bunch * ('a, 'v) bunch * 'v p
+  [@@deriving show]
 
 val map : ('a -> 'b) -> ('a, 'v) bunch -> ('b, 'v) bunch
 val map2 : ('a -> 'b -> 'c) -> ('a, 'v) bunch -> ('b, 'v) bunch -> ('c, 'v) bunch
@@ -18,6 +20,7 @@ type path =
   | PHere
   | PLeft of path
   | PRight of path
+  [@@deriving show]
 
 val index : ('a, 'v) bunch -> path -> 'a option
 val replace : ('a, 'v) bunch -> path -> 'a -> ('a, 'v) bunch
@@ -28,5 +31,6 @@ type ('a, 'v) bunch_partial =
   | BPHole
   | BPHoleLeft of ('a, 'v) bunch_partial * ('a, 'v) bunch * 'v p
   | BPHoleRight of ('a, 'v) bunch * ('a, 'v) bunch_partial * 'v p
+  [@@deriving show]
 
 val fill_hole : ('a, 'v) bunch_partial -> 'a -> ('a, 'v) bunch
