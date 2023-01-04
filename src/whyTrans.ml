@@ -73,8 +73,6 @@ let why3_type kind = match kind with
   | Space -> Ty.ty_real
 
 let get_why3_sym th name =
-  (* List.iter (fun x -> why_info UNKNOWN "%a" WT.print_meta_desc x) (WT.list_metas ()); *)
-  (* List.iter _  (WT.ns_find_ts )th.th_decls; *)
   try WT.ns_find_ls th.WT.th_export [name]
   with Not_found -> why_error dp "Primitive %s cannot be mapped to Why3" name
 
@@ -208,9 +206,6 @@ let rec why3_si ctx si =
 
   | SiRoot (PVar v, si) ->
     let w_v = why3_si ctx (SiVar v) in
-    (* why_info UNKNOWN "%a" pp_list_var v; *)
-    (* exit 1 *)
-    (* let w_v = why3_si ctx (PVar v) in *)
     let w_si = why3_si ctx si in
     T.t_app_infer why3_pow [w_si; why3_inv w_v]
 
@@ -243,7 +238,6 @@ let why3_eq_cs ctx (SiEq (si1, si2)) =
     T.ps_app why3_eq [w_si1; w_si2]
 
 let why3_cs cs =
-  why_info UNKNOWN "c_kind_ctx = %a" Print.pp_tyvar_ctx cs.c_kind_ctx;
   let ctx     = cs.c_kind_ctx          in
   let w_lower = why3_si ctx cs.c_lower in
   let w_upper = why3_si ctx cs.c_upper in
@@ -266,8 +260,6 @@ let close_term t =
 
 let why3_translate cs =
   H.clear !vmap;
-  why_info UNKNOWN "constr to be translated: %a" pp_constr cs;
-
   let i = cs.c_info in
 
   try

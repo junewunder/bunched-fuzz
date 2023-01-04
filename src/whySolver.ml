@@ -82,7 +82,6 @@ let z3_driver : Driver.driver =
     exit 1
 
 let post cs =
-  why_info UNKNOWN "cs=%a" P.print_term cs;
   let task    = None                                                   in
   let goal_id = Decl.create_prsymbol (Ident.id_fresh "ty_goal")        in
   let task    = Task.use_export task WT.int_theory                     in
