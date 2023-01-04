@@ -146,7 +146,7 @@ let send_smt cs =
   if Opts.comp_enabled Opts.SMT then
     post why3_cs
   else
-    true
+    (why_info i "!*! SMT component not enabled, skipping constraint, change in variable `default_components` in support.ml"; true)
 
 (* let test6 () = *)
 (*   printf "@[task 2 is:@\n%a@]@." Pretty.print_task task2; *)
