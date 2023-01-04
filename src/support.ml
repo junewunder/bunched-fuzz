@@ -20,7 +20,8 @@ module Options = struct
   [@@deriving show]
 
   let default_components =
-    [Lexer; Parser; TypeChecker; SMT]
+    [Lexer; Parser; TypeChecker]
+    (* [Lexer; Parser; TypeChecker; SMT] *)
     (* [Lexer; Parser; TypeChecker; Backend] *)
 
   let components = ref default_components

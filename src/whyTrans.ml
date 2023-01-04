@@ -177,8 +177,6 @@ let why3_lp t1 t2 p =
     ; why3_inv p
     ]
 
-let offset_p_var v ctx = { v with v_index = v.v_index + List.length ctx }
-
 (* Map si to why3 expressions *)
 let rec why3_si ctx si =
   match si with
@@ -189,7 +187,6 @@ let rec why3_si ctx si =
   (* | SiInfty *)
   | SiConst f -> why3_fin f
   | SiVar   v ->
-    why_info UNKNOWN "[%s]%i/%i" v.v_name v.v_index v.v_size;
     let w_v = T.t_var @@ get_why3_var ctx v in
 
     (* Cast to real if an int variable *)
@@ -209,20 +206,20 @@ let rec why3_si ctx si =
     let w_si2 = why3_si ctx si2 in
     T.t_app_infer why3_rmult [w_si1; w_si2]
 
-  | SiRoot (PVar v, _si) ->
-    (* let w_v = why3_si ctx (SiVar (offset_p_var v ctx)) in *)
-    why_info UNKNOWN "[%s]%i/%i" v.v_name v.v_index v.v_size;
-    exit 1
+  | SiRoot (PVar v, si) ->
+    let w_v = why3_si ctx (SiVar v) in
+    (* why_info UNKNOWN "%a" pp_list_var v; *)
+    (* exit 1 *)
     (* let w_v = why3_si ctx (PVar v) in *)
-    (* let w_si = why3_si ctx si in *)
-    (* T.t_app_infer why3_pow [w_si; why3_inv w_v] *)
+    let w_si = why3_si ctx si in
+    T.t_app_infer why3_pow [w_si; why3_inv w_v]
 
   | SiRoot (PConst f, si) ->
     let w_si = why3_si ctx si in
     T.t_app_infer why3_pow [w_si; why3_inv @@ why3_fin f]
 
   | SiLp (si1, si2, PVar v) ->
-    let w_v = why3_si ctx (SiVar (offset_p_var v ctx)) in
+    let w_v = why3_si ctx (SiVar v) in
     let w_si1 = why3_si ctx si1 in
     let w_si2 = why3_si ctx si2 in
     why3_lp w_si1 w_si2 @@ why3_inv w_v
@@ -269,6 +266,7 @@ let close_term t =
 
 let why3_translate cs =
   H.clear !vmap;
+  why_info UNKNOWN "constr to be translated: %a" pp_constr cs;
 
   let i = cs.c_info in
 

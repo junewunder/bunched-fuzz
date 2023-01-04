@@ -122,7 +122,17 @@ let rec si_map n f si =
   | SiAdd  (x, y)   -> SiAdd (smf x, smf y)
   | SiMult (x, y)   -> SiMult(smf x, smf y)
   | SiInfty         -> SiInfty
+  | SiRoot (PVar v, s) -> (
+      match (f n v) with
+      | SiVar v' -> SiRoot (PVar v', smf s)
+      | _x -> exit 1 (* I have literally no idea what could cause this case so this is the behavior I've decided on *)
+    )
   | SiRoot (p, s)   -> SiRoot (p, smf s)
+  | SiLp (s1, s2, PVar v) -> (
+      match (f n v) with
+      | SiVar v' -> SiLp (smf s1, smf s2, PVar v')
+      | _x -> exit 1  (* I have literally no idea what could cause this case so this is the behavior I've decided on *)
+    )
   | SiLp (s1, s2, p) -> SiLp (smf s1, smf s2, p)
   | SiLub  (s1, s2) -> SiLub (smf s1, smf s2)
   | SiSup  (bi, k, s) -> SiSup (bi, k, smb s)
