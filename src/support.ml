@@ -17,9 +17,11 @@ module Options = struct
   | TypeChecker
   | SMT
   | Backend
+  [@@deriving show]
 
   let default_components =
-    [Lexer; Parser; TypeChecker; SMT]
+    [Lexer; Parser; TypeChecker]
+    (* [Lexer; Parser; TypeChecker; SMT] *)
     (* [Lexer; Parser; TypeChecker; Backend] *)
 
   let components = ref default_components
@@ -36,6 +38,7 @@ module Options = struct
       PrVarName
     | PrVarIndex
     | PrVarBoth
+    [@@deriving show]
 
   type debug_options = {
     components   : component list;
@@ -46,6 +49,7 @@ module Options = struct
     var_output   : pr_vars; (* Ouput names of vars *)
     full_context : bool;    (* Only names in ctx   *)
   }
+  [@@deriving show]
 
   let debug_default = {
     components   = [General;Lexer;Parser;TypeChecker;SMT;Backend];
@@ -62,8 +66,8 @@ end
 
 module FileInfo = struct
 
-  type info = FI of string * int * int | UNKNOWN
-  type 'a withinfo = {i: info; v: 'a}
+  type info = FI of string * int * int | UNKNOWN [@@deriving show]
+  type 'a withinfo = {i: info; v: 'a} [@@deriving show]
 
   let dummyinfo = UNKNOWN
   let createInfo f l c = FI(f, l, c)

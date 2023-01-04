@@ -50,6 +50,8 @@ let why_debug3  fi   = message 6 Opts.SMT fi
 (* let fin_theory  : WT.theory = WEnv.find_theory WC.env ["real"] "FromInt" *)
 
 let real_theory    : WT.theory = WEnv.read_theory WC.env ["real"] "Real"
+let pow_theory     : WT.theory = WEnv.read_theory WC.env ["real"] "PowerReal"
+let minmax_theory  : WT.theory = WEnv.read_theory WC.env ["real"] "MinMax"
 let int_theory     : WT.theory = WEnv.read_theory WC.env ["int"]  "Int"
 let dfuzz_theory   : WT.theory = WEnv.read_theory WC.env ["dFuzz"] "AbsR"
 
@@ -111,6 +113,9 @@ let why3_leq = WT.ns_find_ls real_theory.WT.th_export ["infix <="]
 
 let why3_radd  = get_why3_sym real_theory "infix +"
 let why3_rmult = get_why3_sym real_theory "infix *"
+let why3_inv = get_why3_sym real_theory "inv"
+let why3_pow = get_why3_sym pow_theory "pow"
+let why3_max = get_why3_sym minmax_theory "max"
 
 let why3_fromint  = get_why3_sym dfuzz_theory "fromInt"
 let why3_fromreal = get_why3_sym dfuzz_theory "fromReal"
@@ -118,6 +123,7 @@ let why3_fromreal = get_why3_sym dfuzz_theory "fromReal"
 (* We need to keep track of the deBruijn Why3 variable mapping *)
 let vmap : ((int, T.vsymbol) H.t) ref = ref (H.create 256)
 
+(* TODO: put space variables in their own scope *)
 let rec get_why3_var ctx v =
   let n     = v.v_name   in
   let index = v.v_index  in
@@ -157,6 +163,18 @@ let why3_float f =
 let why3_fin f =
   T.t_app_infer why3_fromreal [why3_float f]
 
+let why3_inv t = T.t_app_infer why3_inv [t]
+
+let why3_lp t1 t2 p =
+  let app = T.t_app_infer in
+  app why3_pow
+    [ app why3_radd
+      [ app why3_pow [t1; p]
+      ; app why3_pow [t2; p]
+      ]
+    ; why3_inv p
+    ]
+
 (* Map si to why3 expressions *)
 let rec why3_si ctx si =
   match si with
@@ -185,7 +203,34 @@ let rec why3_si ctx si =
     let w_si1 = why3_si ctx si1 in
     let w_si2 = why3_si ctx si2 in
     T.t_app_infer why3_rmult [w_si1; w_si2]
-  | _ ->  why_error dp "Cannot translate extended sensitivities @[%a@]" P.pp_si si
+
+  | SiRoot (PVar v, si) ->
+    let w_v = why3_si ctx (SiVar v) in
+    let w_si = why3_si ctx si in
+    T.t_app_infer why3_pow [w_si; why3_inv w_v]
+
+  | SiRoot (PConst f, si) ->
+    let w_si = why3_si ctx si in
+    T.t_app_infer why3_pow [w_si; why3_inv @@ why3_fin f]
+
+  | SiLp (si1, si2, PVar v) ->
+    let w_v = why3_si ctx (SiVar v) in
+    let w_si1 = why3_si ctx si1 in
+    let w_si2 = why3_si ctx si2 in
+    why3_lp w_si1 w_si2 @@ why3_inv w_v
+
+  | SiLp (si1, si2, PConst f) ->
+    let w_si1 = why3_si ctx si1 in
+    let w_si2 = why3_si ctx si2 in
+    why3_lp w_si1 w_si2 @@ why3_fin f
+
+  | SiLp (si1, si2, PInfty) ->
+    let w_si1 = why3_si ctx si1 in
+    let w_si2 = why3_si ctx si2 in
+    T.t_app_infer why3_max [w_si1; w_si2]
+
+  | SiRoot (PInfty, si) -> why_error dp "Cannot have p=infty in a root sensitivity expr @[%a@]" P.pp_si si
+  | _ -> why_error dp "Cannot translate extended sensitivities @[%a@]" P.pp_si si
 
 let why3_eq_cs ctx (SiEq (si1, si2)) =
     let w_si1 = why3_si ctx si1 in
@@ -215,7 +260,6 @@ let close_term t =
 
 let why3_translate cs =
   H.clear !vmap;
-
   let i = cs.c_info in
 
   try

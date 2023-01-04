@@ -2,12 +2,14 @@
  (name dfuzz)
  (wrapped false)
  (modules :standard \ dfuzz)
- (libraries unix menhirLib why3))
+ (libraries unix menhirLib why3)
+ (preprocess (pps ppx_deriving.show ppx_deriving.ord)))
 
 (executable
  (public_name dfuzz)
  (modules dfuzz)
- (libraries dfuzz))
+ (libraries dfuzz)
+ (preprocess (pps ppx_deriving.show ppx_deriving.ord)))
 
 (ocamllex lexer)
 (menhir

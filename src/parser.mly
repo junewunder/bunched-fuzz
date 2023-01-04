@@ -195,6 +195,8 @@ let rec remove_quantifiers ty = match ty with
 %token <Support.FileInfo.info> DOT
 %token <Support.FileInfo.info> ZERO
 %token <Support.FileInfo.info> SUCC
+%token <Support.FileInfo.info> LP
+%token <Support.FileInfo.info> ROOT
 
 /* Identifier and constant value tokens */
 %token <string Support.FileInfo.withinfo> ID
@@ -452,19 +454,39 @@ AExpr:
 
 /* Sensitivities and sizes */
 SensTerm :
-    SensTerm ADD SensMulTerm
+  | SensTerm ADD SensMulTerm
       { fun ctx -> SiAdd($1 ctx, $3 ctx) }
   | SensMulTerm
       { $1 }
 
 SensMulTerm :
-    SensMulTerm MUL SensAtomicTerm
+  | SensMulTerm MUL SensAtomicTerm
       { fun ctx -> SiMult($1 ctx, $3 ctx) }
   | SensAtomicTerm
       { $1 }
 
+SensAtomicTerm :
+  | ROOT SpaceAnn LPAREN SensTerm RPAREN
+      { fun ctx -> SiRoot($2 ctx, $4 ctx) }
+  | LP SpaceAnn LPAREN SensTerm COMMA SensTerm RPAREN
+      { fun ctx -> SiLp($4 ctx, $6 ctx, $2 ctx) }
+  | ID
+      { fun ctx -> let (v, k) = existing_tyvar $1.i $1.v ctx in
+                   match k with
+                   | Star -> parser_error $1.i "Cannot bind a type variable in sensitivity"
+                   | _    -> SiVar v
+      }
+  | INTV
+      { fun _cx ->
+        (int_to_speano $1.v)
+      }
+  | FLOATV
+      { fun _cx -> SiConst $1.v }
+  | INF
+      { fun _cx -> SiInfty }
+
 SizeTerm :
-    ID
+  | ID
       { fun ctx -> let (v, k) = existing_tyvar $1.i $1.v ctx in
                    match k with
                    | Star -> parser_error $1.i "Cannot bind a type variable in sensitivity"
@@ -480,20 +502,6 @@ SizeTerm :
       { fun ctx ->
         SiSucc ($2 ctx)
       }
-
-SensAtomicTerm :
-    ID
-      { fun ctx -> let (v, k) = existing_tyvar $1.i $1.v ctx in
-                   match k with
-                   | Star -> parser_error $1.i "Cannot bind a type variable in sensitivity"
-                   | _    -> SiVar v
-      }
-  | INTV
-      { fun _cx ->
-        (int_to_speano $1.v)
-      }
-  | FLOATV
-      { fun _cx -> SiConst $1.v }
 
 SensType :
   | COLON SpaceAnn MaybeSensitivity Type

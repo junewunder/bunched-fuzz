@@ -93,6 +93,8 @@ let reservedWords = [
   ("int", fun i -> Parser.INT i);
   ("Z", fun i -> Parser.ZERO i);
   ("S", fun i -> Parser.SUCC i);
+  ("L", fun i -> Parser.LP i);
+  ("root", fun i -> Parser.ROOT i);
 ]
 
 (* Support functions *)

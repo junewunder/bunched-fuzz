@@ -151,6 +151,7 @@ let rec pp_si fmt s =
   | SiMult(si1, si2)       -> fprintf fmt "(%a * %a)" pp_si si1 pp_si si2
   | SiInfty                -> fprintf fmt "%s" (u_sym Symbols.Inf)
   | SiLub  (s1, s2)        -> fprintf fmt "(%a @<1>%s %a)" pp_si s1 (u_sym Symbols.Lub) pp_si s2
+  | SiRoot (p, s)          -> fprintf fmt "root[%a](%a)" pp_p p pp_si s
   | SiLp  (s1, s2, p)      -> fprintf fmt "L[%a](%a, %a)" pp_p p pp_si s1 pp_si s2
   | SiSup  (bi, k, s)      -> fprintf fmt "sup(%a : %a, %a)"  pp_binfo bi pp_kind k pp_si s
   | SiCase (s, s0, bi, sn) -> fprintf fmt "case(%a, %a, %a, %a)" pp_si s pp_si s0 pp_binfo bi pp_si sn
@@ -178,7 +179,9 @@ let pp_ctx_eq =
   pp_list pp_si_eq
 
 let pp_cs fmt cs =
-  fprintf fmt "@[<h>%a@] | @[<h>%a@] %s @[%a@] %s @[%a@]" pp_tyvar_ctx cs.c_kind_ctx
+  fprintf fmt "%a @[<h>%a@] | @[<h>%a@] %s @[%a@] %s @[%a@]"
+    Support.FileInfo.pp_fileinfo cs.c_info
+    pp_tyvar_ctx cs.c_kind_ctx
     pp_ctx_eq cs.c_cs (u_sym Symbols.Vdash)
     pp_si cs.c_upper (u_sym Symbols.Geq) pp_si cs.c_lower
 

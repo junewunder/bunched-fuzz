@@ -32,6 +32,7 @@ type ty_error_elem =
 | NotSubtype   of ty * ty
 | NotSubtypeP  of p * p
 | Internal     of string
+[@@deriving show]
 
 let ty_seq = ref 0
 
@@ -48,12 +49,13 @@ let ty_debug3  fi = message 6 Opt.TypeChecker fi
 type 'a ty_error =
   Right of 'a
 | Left  of ty_error_elem withinfo
+[@@deriving show]
 
 (* Native @@ is already in ocaml 4.0 *)
 let (@@) x y = x y
 
 (* Reader/Error monad for type-checking *)
-type 'a checker = context -> 'a ty_error
+type 'a checker = context -> 'a ty_error [@@deriving show]
 
 let (>>=) (m : 'a checker) (f : 'a -> 'b checker) : 'b checker =
   fun ctx ->
@@ -116,8 +118,8 @@ let si_infty = SiInfty
    functions. In the type-checking algorithm, □ represents a binding
    that doesn't have an assigned sensitivity, which must be
    later on. *)
-type bsi = si option
-type bsi_ctx = (bsi, list_var) bunch
+type bsi = si option [@@deriving show]
+type bsi_ctx = (bsi, list_var) bunch [@@deriving show]
 
 (* A list only with zero sensitivities *)
 let rec zeros b : bsi_ctx =
@@ -422,6 +424,10 @@ let rec kind_of (i : info) (si : si) : kind checker =
   | SiLub  (x, y) ->
     kind_of i x >>= ck >>
     kind_of i y >>= ck >>
+    return Sens
+
+  | SiRoot (_, x) ->
+    kind_of i x >>= ck >>
     return Sens
 
   | SiLp (x, y, _) ->
