@@ -162,6 +162,7 @@ module Optimize = struct
     | SiRoot (PInfty, _) -> false
     | SiRoot (_, x) -> is_standard x
     | SiLp   (si1, si2, _) -> is_standard si1 && is_standard si2
+    | SiContrFac _ -> true
     | SiLub  _
     | SiSup  _
     | SiCase _ -> false

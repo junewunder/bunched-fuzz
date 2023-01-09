@@ -105,6 +105,7 @@ type si =
   | SiLub   of si * si
   | SiRoot  of p * si
   | SiLp    of si * si * p
+  | SiContrFac of p * p
   (* We only allow to sup to happen over the first variable *)
   | SiSup   of binder_info * kind * si
   | SiCase  of si * si * binder_info * si
@@ -134,6 +135,7 @@ let rec si_map n f si =
       | _x -> exit 1  (* I have literally no idea what could cause this case so this is the behavior I've decided on *)
     )
   | SiLp (s1, s2, p) -> SiLp (smf s1, smf s2, p)
+  | SiContrFac (p, q) -> SiContrFac (p, q)
   | SiLub  (s1, s2) -> SiLub (smf s1, smf s2)
   | SiSup  (bi, k, s) -> SiSup (bi, k, smb s)
   | SiCase (s, s0, bi, sn) -> SiCase (smf s, smf s0, bi, smb sn)

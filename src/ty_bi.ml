@@ -378,9 +378,6 @@ let get_var_ty (v : bunch_var) : ty checker =
   let* ctx = get_ctx in
   return @@ snd (access_var ctx v.v_index)
 
-let contr (p : p) (bsis1 : bsi_ctx) (bsis2 : bsi_ctx) : bsi_ctx =
-  Bunch.map2 (contr_bsi p) bsis1 bsis2
-
 let add_sens (bsis1 : bsi_ctx) (bsis2 : bsi_ctx) : bsi_ctx =
   Bunch.map2 add_bsi bsis1 bsis2
 
@@ -395,6 +392,21 @@ let sup_sens (bi : binder_info) (k : kind) (bsis : bsi_ctx) : bsi_ctx =
 
 let case_sens (si : si) (bsis0 : bsi_ctx) (bi : binder_info) (bsisn : bsi_ctx) : bsi_ctx =
   Bunch.map2 (fun bsi0 bsin -> case_bsi si bsi0 bi bsin) bsis0 bsisn
+
+let rec contr (p : p) (bsis1 : bsi_ctx) (bsis2 : bsi_ctx) : bsi_ctx =
+  match bsis1, bsis2 with
+  | BEmpty, BEmpty  -> BEmpty
+  | BLeaf x, BLeaf y -> BLeaf (contr_bsi p x y)
+  | BBranch (l1, r1, p1), BBranch (l2, r2, p2) when p1 = p2 ->
+    let scale1 = Some (SiContrFac (p, p1)) in
+    let scale2 = Some (SiContrFac (p, p2)) in
+    BBranch ((scale_sens scale1 (contr p l1 l2)), (scale_sens scale2 (contr p r1 r2)), p)
+  | _ -> raise BunchPathMatch
+
+(* old unsound contr rule *)
+(* let contr (p : p) (bsis1 : bsi_ctx) (bsis2 : bsi_ctx) : bsi_ctx =
+  Bunch.map2 (contr_bsi p) bsis1 bsis2 *)
+
 
 (**********************************************************************)
 (* Main typing routines                                               *)
@@ -434,6 +446,8 @@ let rec kind_of (i : info) (si : si) : kind checker =
     kind_of i x >>= ck >>
     kind_of i y >>= ck >>
     return Sens
+
+  | SiContrFac (_, _) -> return Sens
 
   | SiSup  (bi, k, s)         ->
     let* _k' = with_extended_ty_ctx bi.b_name k (kind_of i s) in

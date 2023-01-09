@@ -91,15 +91,20 @@ end
 
 theory AbsR
 
+  use real.Real
   use real.RealInfix
   use real.FromInt
   use real.Abs
+  use real.PowerReal
 
   function fromReal (x : real) : real =
     (abs x)
 
   function fromInt (x : int) : real =
     abs (from_int x)
+
+  function contrFactor (p : real) (q : real) : real =
+    pow 2. (abs ((inv p) -. (inv q)))
 
 end
 
