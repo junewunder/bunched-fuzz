@@ -366,10 +366,12 @@ let with_extended_ctx (i : info) (v : string) (ty : ty) (p : p) (m : (ty * bsi_c
    the extended context, while vy has index 0. The order of the
    returned results matches those of the arguments. *)
 let with_extended_ctx_2 (i : info)
-    (vx : string) (tyx : ty) (vy : string) (tyy : ty) (p : p)
-    (m : (ty * bsi_ctx) checker) : (ty * bsi * bsi * bsi_ctx) checker =
+    (vx : string) (tyx : ty)
+    (vy : string) (tyy : ty)
+    (p : p) (m : (ty * bsi_ctx) checker)
+    : (ty * bsi * bsi * bsi_ctx) checker =
   let* (res, res_ext_ctx) =
-    with_new_ctx (fun ctx -> extend_var2 vy tyy vx tyx ~p:p ~q:p ctx) m
+    with_new_ctx (fun ctx -> extend_var2 vx tyx vy tyy ~p:p ~q:p ctx) m
   in match res_ext_ctx with
   | BBranch (res_ctx, BBranch (BLeaf res_x, BLeaf res_y, _), _) -> return (res, res_x, res_y, res_ctx)
   | _ -> fail i @@ Internal "Computation on extended context didn't produce enough results"
@@ -478,6 +480,8 @@ let rec type_of (t : term) : (ty * bsi_ctx) checker  =
   ty_debug (tmInfo t) "--> [%3d] Enter type_of: @[%a@]" !ty_seq
     (Print.limit_boxes Print.pp_term) t; incr ty_seq;
 
+  message 0 TypeChecker UNKNOWN "t = %a" pp_term t;
+
   let* ctx = get_ctx in
   ty_debug (tmInfo t) "<-- Context: @[%a@]" Print.pp_context ctx;
   let* ty, sis = match t with
@@ -485,6 +489,8 @@ let rec type_of (t : term) : (ty * bsi_ctx) checker  =
     | TmVar(_i, v) ->
       let* ctx = get_ctx in
       let* ty  = get_var_ty v in
+      message 0 TypeChecker UNKNOWN "v = %a" pp_bunch_var v;
+      message 0 TypeChecker UNKNOWN "ty = %a" Print.pp_type ty;
       return (ty, singleton ctx.var_ctx v)
 
     (* Primitive terms *)
@@ -697,19 +703,17 @@ let rec type_of (t : term) : (ty * bsi_ctx) checker  =
         end
       in
 
-      (* XXX: Review this *)
       return (ty, add_sens (case_sens sz sis_ztm si sis_stm)
         (scale_sens (Some (SiCase (sz, si_zero, si, si_of_bsi si_nat)))
           sis_e))
 
     | TmListCase(i, tm, ty, ntm, elem, list, si, ctm) ->
-      (* XXX: Again, this is based on natcase, but since this was not
-        explicitly formalized in the paper, we should double-check this
-        really carefully *)
-      (* EG: LGTM *)
-
       let* (ty_e, sis_e) = type_of tm in
       let* (ty_e', sz) = check_list_shape i ty_e in
+      message 0 TypeChecker UNKNOWN "tm = %a" Print.pp_term tm;
+      message 0 TypeChecker UNKNOWN "ntm = %a" Print.pp_term ntm;
+      message 0 TypeChecker UNKNOWN "elem = %a" pp_binder_info elem;
+      message 0 TypeChecker UNKNOWN "ty_e' = %a" Print.pp_type ty_e';
       (* XXX: Do we need to check that sz has kind Size? *)
       (* EG: It wouldn't hurt, but I cannot see how it could slip. *)
 

@@ -62,3 +62,8 @@ $ dune exec -- dfuzz examples/dfuzz/cdf.fz
 ```
 
 and it should work
+
+# june todo
+
+- implement second monad
+- add plists?

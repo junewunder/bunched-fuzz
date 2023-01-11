@@ -1,0 +1,13 @@
+function seq
+  forall (A, n : size, p : space)
+    (l :[p] list(fuzzy A)[n])
+  : fuzzy list(A)[n] {
+  listcase l of fuzzy list(A)[n] {
+    [] => return[p] (nil@[A] ())
+    | x :: l'[n'] =>
+      sample y = x;
+      cons@[A] y (seq@[A][n'][p] l')
+  }
+}
+
+seq

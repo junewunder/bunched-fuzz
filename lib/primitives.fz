@@ -89,6 +89,6 @@ primitive parse_queries forall (p : space) (dbs:[p][] db_source) : (clipped,[p] 
 // primitive zero (u : ())                   : nat[0] { "zero" }
 // primitive succ forall(i:size) (e: nat[i]) : nat[i+1] { "succ" }
 
-primitive nil  forall(p : space, A)         (u :[p] ())                      : list(A)[Z]   { "nil" }
-primitive cons forall(p : space, A, i:size) (e :[p][] A) (el :[p][] list(A)[i]) : list(A)[S i] { "cons" }
+primitive nil  forall(A)         (u :[1.0] ())                      : list(A)[Z]   { "nil" }
+primitive cons forall(A, i:size) (e :[1.0][] A) (el :[1.0][] list(A)[i]) : list(A)[S i] { "cons" }
 
