@@ -491,6 +491,7 @@ let rec type_of (t : term) : (ty * bsi_ctx) checker  =
       let* ty  = get_var_ty v in
       message 0 TypeChecker UNKNOWN "v = %a" pp_bunch_var v;
       message 0 TypeChecker UNKNOWN "ty = %a" Print.pp_type ty;
+      message 0 TypeChecker UNKNOWN "ctx = %a" pp_context ctx;
       return (ty, singleton ctx.var_ctx v)
 
     (* Primitive terms *)
