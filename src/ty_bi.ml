@@ -490,18 +490,13 @@ let rec type_of (t : term) : (ty * bsi_ctx) checker  =
   ty_debug (tmInfo t) "--> [%3d] Enter type_of: @[%a@]" !ty_seq
     (Print.limit_boxes Print.pp_term) t; incr ty_seq;
 
-  message 0 TypeChecker UNKNOWN "t = %a" pp_term t;
-
-  (* let* ctx = get_ctx in *)
-  (* ty_debug (tmInfo t) "<-- Context: @[%a@]" Print.pp_context ctx; *)
+  let* ctx = get_ctx in
+  ty_debug (tmInfo t) "<-- Context: @[%a@]" Print.pp_context ctx;
   let* ty, sis = match t with
     (* Variables *)
     | TmVar(_i, v) ->
       let* ctx = get_ctx in
       let* ty  = get_var_ty v in
-      message 0 TypeChecker UNKNOWN "v = %a" pp_bunch_var v;
-      message 0 TypeChecker UNKNOWN "ty = %a" Print.pp_type ty;
-      (* message 0 TypeChecker UNKNOWN "ctx = %a" pp_context ctx; *)
       return (ty, singleton ctx.var_ctx v)
 
     (* Primitive terms *)
@@ -532,11 +527,6 @@ let rec type_of (t : term) : (ty * bsi_ctx) checker  =
         Returns α and the sensitivity inside ty1 *)
       let* (tya, r) = check_app i ty1 ty2 in
 
-      (* message 0 TypeChecker UNKNOWN "DIVIDER1--------------------------------------------------";
-      message 0 TypeChecker UNKNOWN "sis1 = %a" pp_bsi_ctx sis1;
-      message 0 TypeChecker UNKNOWN "DIVIDER2--------------------------------------------------";
-      message 0 TypeChecker UNKNOWN "sis2 = %a" pp_bsi_ctx (scale_sens (Some r) sis2);
-      message 0 TypeChecker UNKNOWN "DIVIDER3--------------------------------------------------"; *)
       (* We scale by the sensitivity in the type, which comes from an annotation *)
       return (tya, add_sens sis1 (scale_sens (Some r) sis2))
       (* (tya, add_sens sis1 (scale_sens (Some r) sis2)) *)
@@ -569,12 +559,8 @@ let rec type_of (t : term) : (ty * bsi_ctx) checker  =
       return (ty_e, add_sens sis_e (scale_sens (mult_bsi (Some si_infty) si_x') sis_x))
     | TmSample(i, b_x, tm_x, e) ->
 
-      message 0 TypeChecker UNKNOWN "hello1";
       let* ty_x, sis_x = type_of tm_x in
-      message 0 TypeChecker UNKNOWN "ty_x = %a" pp_ty ty_x;
-      message 0 TypeChecker UNKNOWN "hello2";
       let* ty_x = check_fuzz_shape i ty_x in
-      message 0 TypeChecker UNKNOWN "hello3";
 
       let* (ty_e, si_x, sis_e) = with_extended_ctx i b_x.b_name ty_x PInfty (type_of e) in
 
@@ -742,11 +728,6 @@ let rec type_of (t : term) : (ty * bsi_ctx) checker  =
     | TmListCase(i, tm, ty, ntm, elem, list, si, ctm) ->
       let* (ty_e, sis_e) = type_of tm in
       let* (ty_e', sz) = check_list_shape i ty_e in
-      message 0 TypeChecker UNKNOWN "tm = %a" Print.pp_term tm;
-      message 0 TypeChecker UNKNOWN "ntm = %a" Print.pp_term ntm;
-      message 0 TypeChecker UNKNOWN "elem = %a" pp_binder_info elem;
-      message 0 TypeChecker UNKNOWN "list = %a" pp_binder_info list;
-      message 0 TypeChecker UNKNOWN "ty_e' = %a" Print.pp_type ty_e';
       (* XXX: Do we need to check that sz has kind Size? *)
       (* EG: It wouldn't hurt, but I cannot see how it could slip. *)
 
@@ -768,18 +749,6 @@ let rec type_of (t : term) : (ty * bsi_ctx) checker  =
         (* We must shift the list types as we are under an extended context. *)
         let ty_e_s = ty_shift 0 1 ty_e' in
         with_extended_ctx_2 i elem.b_name ty_e_s list.b_name (TyList (ty_e_s, sz')) (PConst 1.0) begin
-          let* ctx2 = get_ctx in
-          (
-            match ctx2 with
-            | { var_ctx = BBranch (_, BBranch (BLeaf (x, x_t), BLeaf (xs, xs_t), _), _); _} ->
-              (
-              message 0 TypeChecker UNKNOWN "ctx2 x = %a : %a" pp_bunch_var x pp_ty x_t;
-              message 0 TypeChecker UNKNOWN "ctx2 xs = %a : %a" pp_bunch_var xs pp_ty xs_t
-            )
-            | _ -> message 0 TypeChecker UNKNOWN "WRONG PATTERN??? = %a" Print.pp_context ctx2
-          );
-          (* let _ = exit 0 in *)
-
           (* NOTE: sz must be shifted, it comes from a smaller context *)
           let sz_s = si_shift 0 1 sz in
 

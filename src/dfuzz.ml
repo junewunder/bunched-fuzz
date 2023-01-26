@@ -60,7 +60,6 @@ let parse file =
   let pi = Unix.in_channel_of_descr readme in
   let lexbuf = Lexer.create file pi in
   let program =
-    print_endline "hey";
     try Parser.body Lexer.main lexbuf
     with Parsing.Parse_error -> error_msg Parser (Lexer.info lexbuf) "Parse error"
     in
@@ -80,7 +79,8 @@ let type_check program =
   let ty = Ty_bi.get_type program  in
   let cs = Constr.get_cs ()        in
 
-  main_info  dp "Type of the program: @[%a@]" Print.pp_type ty;
+  main_info  dp "Type of the program:@; @[%a@]" Print.pp_type ty;
+  print_endline "";
   main_info  dp "CS: @[<v>%a@]" (Print.pp_list Print.pp_cs) cs;
 
   (* let res = WS.send_smt (List.hd (List.tl cs)) in *)
