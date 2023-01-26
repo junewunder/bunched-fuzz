@@ -12,6 +12,7 @@ type ('a, 'v) bunch =
   | BBranch of ('a, 'v) bunch * ('a, 'v) bunch * 'v p
   [@@deriving show]
 
+val checkShape : ('a, 'v) bunch -> ('b, 'v) bunch -> bool
 val map : ('a -> 'b) -> ('a, 'v) bunch -> ('b, 'v) bunch
 val map2 : ('a -> 'b -> 'c) -> ('a, 'v) bunch -> ('b, 'v) bunch -> ('c, 'v) bunch
 val length : ('a, 'v) bunch -> int

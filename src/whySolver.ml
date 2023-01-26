@@ -136,17 +136,18 @@ let post cs =
 open Constr
 
 let send_smt cs =
-  let i       = cs.c_info                            in
-  let why3_cs = WT.why3_translate cs                 in
+  let i = cs.c_info in
 
-  why_info i "!*! Solving Constraint: @[%a@]" Print.pp_cs cs;
-  why_debug i "!*! Why3 term: @[%a@]"  Why3.Pretty.print_term why3_cs;
-  why_debug i "!*! -----------------------------------------------";
+  why_info i "!*! Generated Constraint:\n\t @[%a@]\n" Print.pp_cs cs;
 
   if Opts.comp_enabled Opts.SMT then
-    post why3_cs
+    let why3_cs = WT.why3_translate cs in (
+      why_debug i "!*! Why3 term: @[%a@]"  Why3.Pretty.print_term why3_cs;
+      why_debug i "!*! -----------------------------------------------";
+      post why3_cs
+    )
   else
-    (why_info i "!*! SMT component not enabled, skipping constraint, change in variable `default_components` in support.ml"; true)
+    true
 
 (* let test6 () = *)
 (*   printf "@[task 2 is:@\n%a@]@." Pretty.print_task task2; *)

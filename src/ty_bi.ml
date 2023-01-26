@@ -395,6 +395,21 @@ let sup_sens (bi : binder_info) (k : kind) (bsis : bsi_ctx) : bsi_ctx =
 let case_sens (si : si) (bsis0 : bsi_ctx) (bi : binder_info) (bsisn : bsi_ctx) : bsi_ctx =
   Bunch.map2 (fun bsi0 bsin -> case_bsi si bsi0 bi bsin) bsis0 bsisn
 
+(* let rec contr (p : p) (bsis1 : bsi_ctx) (bsis2 : bsi_ctx) : bsi_ctx =
+  match bsis1, bsis2 with
+  | BEmpty, BEmpty  -> BEmpty
+  | BLeaf x, BLeaf _ -> BLeaf x
+  | BBranch (l1, r1, p1), BBranch (l2, r2, p2) when p1 = p2 ->
+
+    BBranch
+      ( (contr p l1 l2)
+      , (contr p r1 r2)
+      , p1
+      )
+    (* let scale1 = Some (SiContrFac (p, p1)) in
+    let scale2 = Some (SiContrFac (p, p2)) in
+    BBranch ((scale_sens scale1 (contr p l1 l2)), (scale_sens scale2 (contr p r1 r2)), p) *)
+  | _ -> raise BunchPathMatch *)
 let rec contr (p : p) (bsis1 : bsi_ctx) (bsis2 : bsi_ctx) : bsi_ctx =
   match bsis1, bsis2 with
   | BEmpty, BEmpty  -> BEmpty
@@ -402,13 +417,8 @@ let rec contr (p : p) (bsis1 : bsi_ctx) (bsis2 : bsi_ctx) : bsi_ctx =
   | BBranch (l1, r1, p1), BBranch (l2, r2, p2) when p1 = p2 ->
     let scale1 = Some (SiContrFac (p, p1)) in
     let scale2 = Some (SiContrFac (p, p2)) in
-    BBranch ((scale_sens scale1 (contr p l1 l2)), (scale_sens scale2 (contr p r1 r2)), p)
+    BBranch ((scale_sens scale1 (contr p l1 l2)), (scale_sens scale2 (contr p r1 r2)), p1)
   | _ -> raise BunchPathMatch
-
-(* old unsound contr rule *)
-(* let contr (p : p) (bsis1 : bsi_ctx) (bsis2 : bsi_ctx) : bsi_ctx =
-  Bunch.map2 (contr_bsi p) bsis1 bsis2 *)
-
 
 (**********************************************************************)
 (* Main typing routines                                               *)
@@ -482,8 +492,8 @@ let rec type_of (t : term) : (ty * bsi_ctx) checker  =
 
   message 0 TypeChecker UNKNOWN "t = %a" pp_term t;
 
-  let* ctx = get_ctx in
-  ty_debug (tmInfo t) "<-- Context: @[%a@]" Print.pp_context ctx;
+  (* let* ctx = get_ctx in *)
+  (* ty_debug (tmInfo t) "<-- Context: @[%a@]" Print.pp_context ctx; *)
   let* ty, sis = match t with
     (* Variables *)
     | TmVar(_i, v) ->
@@ -491,7 +501,7 @@ let rec type_of (t : term) : (ty * bsi_ctx) checker  =
       let* ty  = get_var_ty v in
       message 0 TypeChecker UNKNOWN "v = %a" pp_bunch_var v;
       message 0 TypeChecker UNKNOWN "ty = %a" Print.pp_type ty;
-      message 0 TypeChecker UNKNOWN "ctx = %a" pp_context ctx;
+      (* message 0 TypeChecker UNKNOWN "ctx = %a" pp_context ctx; *)
       return (ty, singleton ctx.var_ctx v)
 
     (* Primitive terms *)
@@ -522,6 +532,11 @@ let rec type_of (t : term) : (ty * bsi_ctx) checker  =
         Returns α and the sensitivity inside ty1 *)
       let* (tya, r) = check_app i ty1 ty2 in
 
+      (* message 0 TypeChecker UNKNOWN "DIVIDER1--------------------------------------------------";
+      message 0 TypeChecker UNKNOWN "sis1 = %a" pp_bsi_ctx sis1;
+      message 0 TypeChecker UNKNOWN "DIVIDER2--------------------------------------------------";
+      message 0 TypeChecker UNKNOWN "sis2 = %a" pp_bsi_ctx (scale_sens (Some r) sis2);
+      message 0 TypeChecker UNKNOWN "DIVIDER3--------------------------------------------------"; *)
       (* We scale by the sensitivity in the type, which comes from an annotation *)
       return (tya, add_sens sis1 (scale_sens (Some r) sis2))
       (* (tya, add_sens sis1 (scale_sens (Some r) sis2)) *)
@@ -554,8 +569,12 @@ let rec type_of (t : term) : (ty * bsi_ctx) checker  =
       return (ty_e, add_sens sis_e (scale_sens (mult_bsi (Some si_infty) si_x') sis_x))
     | TmSample(i, b_x, tm_x, e) ->
 
+      message 0 TypeChecker UNKNOWN "hello1";
       let* ty_x, sis_x = type_of tm_x in
+      message 0 TypeChecker UNKNOWN "ty_x = %a" pp_ty ty_x;
+      message 0 TypeChecker UNKNOWN "hello2";
       let* ty_x = check_fuzz_shape i ty_x in
+      message 0 TypeChecker UNKNOWN "hello3";
 
       let* (ty_e, si_x, sis_e) = with_extended_ctx i b_x.b_name ty_x PInfty (type_of e) in
 
@@ -608,8 +627,20 @@ let rec type_of (t : term) : (ty * bsi_ctx) checker  =
       (* Extend context with x and y *)
       let* (ty_t, si_x, si_y, sis_t) = with_extended_ctx_2 i x.b_name ty_x y.b_name ty_y p (type_of t) in
 
+      assert (checkShape sis_e sis_t);
+      let* ctx = get_ctx in
+      assert (checkShape sis_e ctx.var_ctx);
+
       let si_x = si_of_bsi si_x in
       let si_y = si_of_bsi si_y in
+
+      assert (checkShape ctx.var_ctx sis_e);
+      assert (checkShape ctx.var_ctx sis_t);
+
+      assert (checkShape ctx.var_ctx (contr p sis_t sis_e));
+
+      assert (checkShape ctx.var_ctx (scale_sens (Some (SiLub (si_x, si_y))) sis_e));
+      assert (checkShape ctx.var_ctx (contr p sis_t (scale_sens (Some (SiLub (si_x, si_y))) sis_e)));
 
       return (ty_t, contr p sis_t (scale_sens (Some (SiLub (si_x, si_y))) sis_e))
 
@@ -714,6 +745,7 @@ let rec type_of (t : term) : (ty * bsi_ctx) checker  =
       message 0 TypeChecker UNKNOWN "tm = %a" Print.pp_term tm;
       message 0 TypeChecker UNKNOWN "ntm = %a" Print.pp_term ntm;
       message 0 TypeChecker UNKNOWN "elem = %a" pp_binder_info elem;
+      message 0 TypeChecker UNKNOWN "list = %a" pp_binder_info list;
       message 0 TypeChecker UNKNOWN "ty_e' = %a" Print.pp_type ty_e';
       (* XXX: Do we need to check that sz has kind Size? *)
       (* EG: It wouldn't hurt, but I cannot see how it could slip. *)
@@ -736,6 +768,17 @@ let rec type_of (t : term) : (ty * bsi_ctx) checker  =
         (* We must shift the list types as we are under an extended context. *)
         let ty_e_s = ty_shift 0 1 ty_e' in
         with_extended_ctx_2 i elem.b_name ty_e_s list.b_name (TyList (ty_e_s, sz')) (PConst 1.0) begin
+          let* ctx2 = get_ctx in
+          (
+            match ctx2 with
+            | { var_ctx = BBranch (_, BBranch (BLeaf (x, x_t), BLeaf (xs, xs_t), _), _); _} ->
+              (
+              message 0 TypeChecker UNKNOWN "ctx2 x = %a : %a" pp_bunch_var x pp_ty x_t;
+              message 0 TypeChecker UNKNOWN "ctx2 xs = %a : %a" pp_bunch_var xs pp_ty xs_t
+            )
+            | _ -> message 0 TypeChecker UNKNOWN "WRONG PATTERN??? = %a" Print.pp_context ctx2
+          );
+          (* let _ = exit 0 in *)
 
           (* NOTE: sz must be shifted, it comes from a smaller context *)
           let sz_s = si_shift 0 1 sz in
@@ -770,11 +813,12 @@ let rec type_of (t : term) : (ty * bsi_ctx) checker  =
     | TmUnpack(i, _n, _si, _t1, _t2) ->
       typing_error i "DFuzz stub: Unpack"
   in
-
   decr ty_seq;
   (* We limit pp_term *)
   ty_debug (tmInfo t) "<-- [%3d] Exit type_of : @[%a@] with type @[%a@]" !ty_seq
     (Print.limit_boxes Print.pp_term) t Print.pp_type ty;
+  let* ctx = get_ctx in
+  assert (Bunch.checkShape ctx.var_ctx sis);
   (* TODO: pretty printer for sensitivities *)
   (* ty_debug2 (tmInfo t) "<-- Context: @[%a@]" Print.pp_context ctx; *)
 

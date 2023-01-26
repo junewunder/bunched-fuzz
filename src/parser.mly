@@ -382,8 +382,9 @@ STerm :
 
   | LISTCASE Expr OF Type LBRACE LBRACK RBRACK DBLARROW Term PIPE ID DBLCOLON ID LBRACK ID RBRACK DBLARROW Term RBRACE
       { fun ctx ->
-        let ctx_l  = extend_var    $11.v      ctx    in
-        let ctx_ll = extend_var    $13.v      ctx_l  in
+        (*let ctx_l  = extend_var    $11.v      ctx    in
+        let ctx_ll = extend_var    $13.v      ctx_l  in*)
+        let ctx_ll = extend_var2 $11.v $13.v ctx in
         let ctx_si = extend_ty_var $15.v Sens ctx_ll in
         TmListCase($1, $2 ctx, $4 ctx, $9 ctx, nb_var $11.v, nb_var $13.v, nb_var $15.v, $18 ctx_si) }
 

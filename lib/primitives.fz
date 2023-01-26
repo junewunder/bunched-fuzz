@@ -65,8 +65,8 @@ primitive div2 forall (p : space) (n :[p][0.5] num) : num { "div2" }
 primitive div3 forall (p : space) (n :[p][0.333] num) : num { "div3" }
 
 // Probability monad, return and bind
-primitive return   forall(p:space, A)   (x :[p] A)                              : fuzzy A { "_return" }
-primitive p_sample forall(p:space, A,B) (x :[p][] fuzzy A) (f :[p][] A -> fuzzy B) : fuzzy B { "_bind"   }
+primitive return   forall(A, p:space)   (x :[p] A)                              : fuzzy A { "_return" }
+primitive p_sample forall(A,B, p:space) (x :[p][] fuzzy A) (f :[p][] A -> fuzzy B) : fuzzy B { "_bind"   }
 
 primitive cswp forall (p : space) (t :[p][] (num,[p] num)) : (num,[p] num) { "cswp" }
 

@@ -1,0 +1,12 @@
+function map
+  forall (A, B, i : size, s : sens, p : space)
+  (f :[p][i] (A -o[p][s] B))
+  (l :[p][s] list(A)[i])
+  : list(B)[i] {
+  listcase l of list(B)[i] {
+    []          => nil@[B] ()
+  | x :: xs [m] => cons@[B][m] (f x) (map@[A]@[B][m][s][p] f xs)
+  }
+}
+
+map

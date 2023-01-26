@@ -6,7 +6,8 @@ function seq
     [] => return[p] (nil@[A] ())
     | x :: l'[n'] =>
       sample y = x;
-      cons@[A] y (seq@[A][n'][p] l')
+      sample ys = seq@[A][n'][p] l';
+      return[p] (cons@[A][n'] y ys)
   }
 }
 

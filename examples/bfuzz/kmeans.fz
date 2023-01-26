@@ -1,0 +1,122 @@
+function seq
+  forall (A, n : size, p : space)
+    (l :[p] list(fuzzy A)[n])
+  : fuzzy list(A)[n] {
+  listcase l of fuzzy list(A)[n] {
+    [] => return@[ list(A)[Z] ][p] (nil@[A] ())
+    | x :: l'[n'] =>
+      sample y = x;
+      sample ys = seq@[A][n'][p] l';
+      return@[list(A)[n]][p] (cons@[A][n'] y ys)
+  }
+}
+
+function map
+  forall (A, B, i : size, s : sens, p : space)
+  (f :[p][i] (A -o[p][s] B))
+  (l :[p][s] list(A)[i])
+  : list(B)[i] {
+  listcase l of list(B)[i] {
+    []          => nil@[B] ()
+  | x :: xs [m] => cons@[B][m] (f x) (map@[A]@[B][m][s][p] f xs)
+  }
+}
+
+primitive add_noise
+  forall (e : sens, p : space)
+    (eps :[p][inf] num[e])
+    (x :[p][e] num)
+  : fuzzy num
+  { "add_noise" }
+
+primitive assign
+  forall (n : size, p : space)
+    (ms :[p][inf] list((num ,[p] num))[n])
+    (b :[p][1.0] (num ,[p] num) bag)
+  : ((num ,[p] num) ,[p] int) bag
+  { "assign" }
+
+primitive partition
+  forall (n : size, p : space)
+    (labelled_pts :[p][1.0] ((num ,[p] num) ,[p] int) bag)
+  : list((num ,[p] num) bag)[n]
+  { "partition" }
+
+primitive totx
+  forall (p : space)
+    (pts :[p][1.0] (num ,[p] num) bag)
+  : num
+  { "totx" }
+
+primitive toty
+  forall (p : space)
+    (pts :[p][1.0] (num ,[p] num) bag)
+  : num
+  { "toty" }
+
+primitive zip
+  forall (A, B, n : size, p : space)
+    (xs :[p][1.0] list(A)[n])
+    (ys :[p][1.0] list(B)[n])
+  : list((A ,[p] B))[n]
+  { "zip" }
+
+function avg
+  forall (p : space)
+    (xyt :[p][1.0] ((fuzzy num ,[p] fuzzy num) ,[p] fuzzy num))
+  : fuzzy (num ,[p] num) {
+    let (xy, t) = xyt;
+    let (x, y) = xy;
+    sample x' = x;
+    sample y' = y;
+    sample t' = t;
+    return@[(num ,[p] num)][p] ((op_div[p] x' t') ,[p] (op_div[p] y' t'))
+  }
+
+primitive bagsize forall(A, p : space) (b :[p][1.0] A bag) : num { "bagsize" }
+
+function iterate
+  forall (e : sens, i : size, p : space)
+    (eps :[p][inf] num[e])
+    (b :[p][root[p](3)*e] (num,[p] num) bag)
+    (ms :[p][inf] list((num,[p] num))[i])
+    : (fuzzy list((num,[p] num))[i])
+  {
+    b':[] =[p] partition[i][p] (assign[i][p] ms b);
+
+    tx:[] =[p] map@[num]@[fuzzy num][i][1.0][p] (add_noise[e][p] eps)
+                (map@[(num ,[p] num) bag]@[num][i][1.0][p] totx[p] b');
+
+    ty:[] =[p] map@[num]@[fuzzy num][i][1.0][p] (add_noise[e][p] eps)
+                (map@[(num ,[p] num) bag]@[num][i][1.0][p] toty[p] b');
+
+    t:[] =[p] map@[num]@[fuzzy num][i][1.0][p] (add_noise[e][p] eps)
+                (map@[(num ,[p] num) bag]@[num][i][1.0][p] bagsize@[(num,[p] num)][p] b');
+
+    stats:[] =[p] zip@[(fuzzy num ,[p] fuzzy num)]@[fuzzy num][i][p] (zip@[fuzzy num]@[fuzzy num][i][p] tx ty) t;
+
+    seq@[(num ,[p] num)][i][p]
+      (map
+        @[((fuzzy num ,[p] fuzzy num) ,[p] fuzzy num)]
+        @[fuzzy(num ,[p] num)]
+        [i][1.0][p]
+        avg[p]
+        stats)
+}
+
+function kmeans
+  forall (i : size, j : size, e : sens, p : space)
+    (iters   :[p][1] nat[i])
+    (eps     :[p][inf] num[e])
+    (db      :[p][root[p](3) * i * e] (num,[p] num) bag)
+    (centers :[p][inf] list((num,[p] num))[j])
+  : fuzzy list((num,[p] num))[j] {
+    numcase iters of fuzzy list((num,[p] num))[j] {
+        Z      => return@[list((num,[p] num))[j]][p] centers
+      | S n[ii] =>
+        sample next_centers = kmeans[ii][j][e][p] n eps db centers;
+        iterate[e][j][p] eps db next_centers
+    }
+  }
+
+kmeans

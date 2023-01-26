@@ -11,6 +11,7 @@ open Syntax
 open Support.Options
 open Support.Error
 
+
 let outfile    = ref (None : string option)
 let infile     = ref ("" : string)
 
@@ -84,10 +85,9 @@ let type_check program =
 
   (* let res = WS.send_smt (List.hd (List.tl cs)) in *)
   let _res = List.map WS.send_smt cs in
+  if not (comp_enabled SMT) then
+    message 0 SMT UNKNOWN "!*! SMT component not enabled, skipping constraint, change in variable `default_components` in support.ml";
   ()
-
-  (* Disabled as we don't run the programs for now *)
-  (* check_main_type ty *)
 
 let gen_caml program outfile =
   let out  = open_out outfile in

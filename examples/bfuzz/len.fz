@@ -1,0 +1,11 @@
+function len
+  forall (n : size)
+    (l :[1.0] list(bool)[n])
+  : num {
+  listcase l of num {
+    [] => 0.0
+    | x :: l'[n'] => op_add[1.0] 1.0 (len[n'] l')
+  }
+}
+
+len
