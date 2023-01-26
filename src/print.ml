@@ -91,7 +91,9 @@ let rec pp_list pp fmt l = match l with
 let rec pp_bunch pp fmt b = match b with
   | BEmpty -> fprintf fmt " - "
   | BLeaf x -> fprintf fmt "%a" pp x
-  | BBranch (l, r, p) -> fprintf fmt "(@[%a@] ,[%a] @;@[%a@])"
+  (* | BBranch (l, r, p) -> fprintf fmt "@[(%a @]@;@.@[,[%a] %a)@]" *)
+  (* | BBranch (l, r, p) -> fprintf fmt "(%a @.        @[,[%a] %a)@]" *)
+  | BBranch (l, r, p) -> fprintf fmt "%a @.        @[,[%a] %a@]"
     (pp_bunch pp) l
     pp_p p
     (pp_bunch pp) r
@@ -136,7 +138,7 @@ let pp_kind fmt k = match k with
     Star       -> fprintf fmt "*"
   | Size       -> fprintf fmt "%s" (u_sym Symbols.Nat)
   | Sens       -> fprintf fmt "%s" (u_sym Symbols.Num)
-  | Space      -> fprintf fmt "Lp-space"
+  | Space      -> fprintf fmt "Lp-param"
 
 (**********************************************************************)
 (* Pretty printing for sensitivities *)
@@ -153,6 +155,7 @@ let rec pp_si fmt s =
   | SiLub  (s1, s2)        -> fprintf fmt "(%a @<1>%s %a)" pp_si s1 (u_sym Symbols.Lub) pp_si s2
   | SiRoot (p, s)          -> fprintf fmt "root[%a](%a)" pp_p p pp_si s
   | SiLp  (s1, s2, p)      -> fprintf fmt "L[%a](%a, %a)" pp_p p pp_si s1 pp_si s2
+  | SiContrFac (p, q)      -> fprintf fmt "[contr factor %a %a]" pp_p p pp_p q
   | SiSup  (bi, k, s)      -> fprintf fmt "sup(%a : %a, %a)"  pp_binfo bi pp_kind k pp_si s
   | SiCase (s, s0, bi, sn) -> fprintf fmt "case(%a, %a, %a, %a)" pp_si s pp_si s0 pp_binfo bi pp_si sn
 
@@ -227,8 +230,8 @@ let rec pp_type ppf ty = match ty with
   | TyLollipop(ty1, s, ty2, p) -> fprintf ppf "(@[<hov>%a %a@[%a] %a@])" pp_type ty1 pp_arrow s pp_p p pp_type ty2
   | TyMu(n, ty)             -> fprintf ppf "@<1>%s %a. @[<hov>(%a)@]" (u_sym Symbols.Mu) pp_binfo n pp_type ty
   (* Abs *)
-  | TyForall(n, k, ty)      -> fprintf ppf "@<1>%s %a : %a.@;(@[%a@])" (u_sym Symbols.Forall) pp_binfo n pp_kind k pp_type ty
-  | TyExistsSize(n, ty)     -> fprintf ppf "@<1>%s %a : n.@;(@[%a@])" (u_sym Symbols.Exists) pp_binfo n pp_type ty
+  | TyForall(n, k, ty)      -> fprintf ppf "@[@<1>%s %a : %a.@;(@[%a@])@]" (u_sym Symbols.Forall) pp_binfo n pp_kind k pp_type ty
+  | TyExistsSize(n, ty)     -> fprintf ppf "@[@<1>%s %a : n.@;(@[%a@])@]" (u_sym Symbols.Exists) pp_binfo n pp_type ty
 
 let pp_type_list = pp_list pp_type
 
@@ -253,7 +256,6 @@ let rec ldrop n l = if n = 0 then l else ldrop (n-1) (List.tl l)
 let pp_context ppf ctx =
   fprintf ppf "Type Context: [@[<v>%a@]]@\nTerm Context: [@[<v>%a@]@]"
     pp_tyvar_ctx (List.rev ctx.tyvar_ctx)
-    (* pp_var_ctx   (ldrop n_prim (List.rev ctx.var_ctx)) *)
     pp_var_ctx ctx.var_ctx
 
 (**********************************************************************)
@@ -384,7 +386,7 @@ let rec pp_term ppf t =
 
 (* We print some applications in an special way, note that this relies on debug information *)
 and print_special_app ppf tm1 tm2 =
-  let regular_print tm1 tm2 = fprintf ppf "(%a@;<1 1>@[<hov>%a@])" pp_term tm1 pp_term tm2 in
+  let regular_print tm1 tm2 = fprintf ppf "@[(%a@;<1 1>@[<hov>%a@])@]" pp_term tm1 pp_term tm2 in
   match tm1 with
     (* Binary operations *)
     TmApp(_, TmVar(_, v), op1) ->

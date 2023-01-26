@@ -366,10 +366,12 @@ let with_extended_ctx (i : info) (v : string) (ty : ty) (p : p) (m : (ty * bsi_c
    the extended context, while vy has index 0. The order of the
    returned results matches those of the arguments. *)
 let with_extended_ctx_2 (i : info)
-    (vx : string) (tyx : ty) (vy : string) (tyy : ty) (p : p)
-    (m : (ty * bsi_ctx) checker) : (ty * bsi * bsi * bsi_ctx) checker =
+    (vx : string) (tyx : ty)
+    (vy : string) (tyy : ty)
+    (p : p) (m : (ty * bsi_ctx) checker)
+    : (ty * bsi * bsi * bsi_ctx) checker =
   let* (res, res_ext_ctx) =
-    with_new_ctx (fun ctx -> extend_var2 vy tyy vx tyx ~p:p ~q:p ctx) m
+    with_new_ctx (fun ctx -> extend_var2 vx tyx vy tyy ~p:p ~q:p ctx) m
   in match res_ext_ctx with
   | BBranch (res_ctx, BBranch (BLeaf res_x, BLeaf res_y, _), _) -> return (res, res_x, res_y, res_ctx)
   | _ -> fail i @@ Internal "Computation on extended context didn't produce enough results"
@@ -377,9 +379,6 @@ let with_extended_ctx_2 (i : info)
 let get_var_ty (v : bunch_var) : ty checker =
   let* ctx = get_ctx in
   return @@ snd (access_var ctx v.v_index)
-
-let contr (p : p) (bsis1 : bsi_ctx) (bsis2 : bsi_ctx) : bsi_ctx =
-  Bunch.map2 (contr_bsi p) bsis1 bsis2
 
 let add_sens (bsis1 : bsi_ctx) (bsis2 : bsi_ctx) : bsi_ctx =
   Bunch.map2 add_bsi bsis1 bsis2
@@ -395,6 +394,31 @@ let sup_sens (bi : binder_info) (k : kind) (bsis : bsi_ctx) : bsi_ctx =
 
 let case_sens (si : si) (bsis0 : bsi_ctx) (bi : binder_info) (bsisn : bsi_ctx) : bsi_ctx =
   Bunch.map2 (fun bsi0 bsin -> case_bsi si bsi0 bi bsin) bsis0 bsisn
+
+(* let rec contr (p : p) (bsis1 : bsi_ctx) (bsis2 : bsi_ctx) : bsi_ctx =
+  match bsis1, bsis2 with
+  | BEmpty, BEmpty  -> BEmpty
+  | BLeaf x, BLeaf _ -> BLeaf x
+  | BBranch (l1, r1, p1), BBranch (l2, r2, p2) when p1 = p2 ->
+
+    BBranch
+      ( (contr p l1 l2)
+      , (contr p r1 r2)
+      , p1
+      )
+    (* let scale1 = Some (SiContrFac (p, p1)) in
+    let scale2 = Some (SiContrFac (p, p2)) in
+    BBranch ((scale_sens scale1 (contr p l1 l2)), (scale_sens scale2 (contr p r1 r2)), p) *)
+  | _ -> raise BunchPathMatch *)
+let rec contr (p : p) (bsis1 : bsi_ctx) (bsis2 : bsi_ctx) : bsi_ctx =
+  match bsis1, bsis2 with
+  | BEmpty, BEmpty  -> BEmpty
+  | BLeaf x, BLeaf y -> BLeaf (contr_bsi p x y)
+  | BBranch (l1, r1, p1), BBranch (l2, r2, p2) when p1 = p2 ->
+    let scale1 = Some (SiContrFac (p, p1)) in
+    let scale2 = Some (SiContrFac (p, p2)) in
+    BBranch ((scale_sens scale1 (contr p l1 l2)), (scale_sens scale2 (contr p r1 r2)), p1)
+  | _ -> raise BunchPathMatch
 
 (**********************************************************************)
 (* Main typing routines                                               *)
@@ -434,6 +458,8 @@ let rec kind_of (i : info) (si : si) : kind checker =
     kind_of i x >>= ck >>
     kind_of i y >>= ck >>
     return Sens
+
+  | SiContrFac (_, _) -> return Sens
 
   | SiSup  (bi, k, s)         ->
     let* _k' = with_extended_ty_ctx bi.b_name k (kind_of i s) in
@@ -587,8 +613,20 @@ let rec type_of (t : term) : (ty * bsi_ctx) checker  =
       (* Extend context with x and y *)
       let* (ty_t, si_x, si_y, sis_t) = with_extended_ctx_2 i x.b_name ty_x y.b_name ty_y p (type_of t) in
 
+      assert (checkShape sis_e sis_t);
+      let* ctx = get_ctx in
+      assert (checkShape sis_e ctx.var_ctx);
+
       let si_x = si_of_bsi si_x in
       let si_y = si_of_bsi si_y in
+
+      assert (checkShape ctx.var_ctx sis_e);
+      assert (checkShape ctx.var_ctx sis_t);
+
+      assert (checkShape ctx.var_ctx (contr p sis_t sis_e));
+
+      assert (checkShape ctx.var_ctx (scale_sens (Some (SiLub (si_x, si_y))) sis_e));
+      assert (checkShape ctx.var_ctx (contr p sis_t (scale_sens (Some (SiLub (si_x, si_y))) sis_e)));
 
       return (ty_t, contr p sis_t (scale_sens (Some (SiLub (si_x, si_y))) sis_e))
 
@@ -683,17 +721,11 @@ let rec type_of (t : term) : (ty * bsi_ctx) checker  =
         end
       in
 
-      (* XXX: Review this *)
       return (ty, add_sens (case_sens sz sis_ztm si sis_stm)
         (scale_sens (Some (SiCase (sz, si_zero, si, si_of_bsi si_nat)))
           sis_e))
 
     | TmListCase(i, tm, ty, ntm, elem, list, si, ctm) ->
-      (* XXX: Again, this is based on natcase, but since this was not
-        explicitly formalized in the paper, we should double-check this
-        really carefully *)
-      (* EG: LGTM *)
-
       let* (ty_e, sis_e) = type_of tm in
       let* (ty_e', sz) = check_list_shape i ty_e in
       (* XXX: Do we need to check that sz has kind Size? *)
@@ -717,7 +749,6 @@ let rec type_of (t : term) : (ty * bsi_ctx) checker  =
         (* We must shift the list types as we are under an extended context. *)
         let ty_e_s = ty_shift 0 1 ty_e' in
         with_extended_ctx_2 i elem.b_name ty_e_s list.b_name (TyList (ty_e_s, sz')) (PConst 1.0) begin
-
           (* NOTE: sz must be shifted, it comes from a smaller context *)
           let sz_s = si_shift 0 1 sz in
 
@@ -751,11 +782,12 @@ let rec type_of (t : term) : (ty * bsi_ctx) checker  =
     | TmUnpack(i, _n, _si, _t1, _t2) ->
       typing_error i "DFuzz stub: Unpack"
   in
-
   decr ty_seq;
   (* We limit pp_term *)
   ty_debug (tmInfo t) "<-- [%3d] Exit type_of : @[%a@] with type @[%a@]" !ty_seq
     (Print.limit_boxes Print.pp_term) t Print.pp_type ty;
+  let* ctx = get_ctx in
+  assert (Bunch.checkShape ctx.var_ctx sis);
   (* TODO: pretty printer for sensitivities *)
   (* ty_debug2 (tmInfo t) "<-- Context: @[%a@]" Print.pp_context ctx; *)
 

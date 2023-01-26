@@ -119,6 +119,7 @@ let why3_max = get_why3_sym minmax_theory "max"
 
 let why3_fromint  = get_why3_sym dfuzz_theory "fromInt"
 let why3_fromreal = get_why3_sym dfuzz_theory "fromReal"
+let why3_contraction_factor = get_why3_sym dfuzz_theory "contrFactor"
 
 (* We need to keep track of the deBruijn Why3 variable mapping *)
 let vmap : ((int, T.vsymbol) H.t) ref = ref (H.create 256)
@@ -176,8 +177,7 @@ let why3_lp t1 t2 p =
     ]
 
 (* Map si to why3 expressions *)
-let rec why3_si ctx si =
-  match si with
+let rec why3_si ctx si = match si with
   | SiZero    -> why3_fin 0.0
   | SiSucc si -> let w_si = why3_si ctx si in
                  T.t_app_infer why3_radd [why3_fin 1.0; w_si]
@@ -228,6 +228,20 @@ let rec why3_si ctx si =
     let w_si1 = why3_si ctx si1 in
     let w_si2 = why3_si ctx si2 in
     T.t_app_infer why3_max [w_si1; w_si2]
+
+  | SiContrFac (PInfty, _)
+  | SiContrFac (_, PInfty) ->
+    why3_fin 1.
+
+  | SiContrFac (p, q) ->
+    let trans_p (p : p) = (match p with
+      | PVar v -> why3_si ctx (SiVar v)
+      | PConst f -> why3_fin f
+      | PInfty -> exit 1 (* unreachable *)
+    ) in
+    let w_p = trans_p p in
+    let w_q = trans_p q in
+    T.t_app_infer why3_contraction_factor [w_p; w_q]
 
   | SiRoot (PInfty, si) -> why_error dp "Cannot have p=infty in a root sensitivity expr @[%a@]" P.pp_si si
   | _ -> why_error dp "Cannot translate extended sensitivities @[%a@]" P.pp_si si

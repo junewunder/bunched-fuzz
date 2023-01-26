@@ -14,6 +14,13 @@ type ('a, 'v) bunch =
   | BBranch of ('a, 'v) bunch * ('a, 'v) bunch * 'v p
 [@@deriving show]
 
+let rec checkShape b1 b2 = match b1, b2 with
+  | BEmpty, BEmpty -> true
+  | BLeaf _, BLeaf _ -> true
+  | BBranch (l1, r1, p1), BBranch (l2, r2, p2) ->
+      checkShape l1 l2 && checkShape r1 r2 && p1 = p2
+  | _ -> false
+
 let rec map f b = match b with
   | BEmpty -> BEmpty
   | BLeaf x -> BLeaf (f x)
@@ -39,7 +46,7 @@ type path =
 [@@deriving show]
 
 let rec index b p = match b, p with
-  | BEmpty, PHere -> None
+  | BEmpty, PHere -> (print_string "EMPTY, HERE"); None
   | BLeaf x, PHere -> Some x
   | BBranch (b, _, _), PLeft p -> index b p
   | BBranch (_, b, _), PRight p -> index b p

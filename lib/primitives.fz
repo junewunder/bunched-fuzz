@@ -65,8 +65,8 @@ primitive div2 forall (p : space) (n :[p][0.5] num) : num { "div2" }
 primitive div3 forall (p : space) (n :[p][0.333] num) : num { "div3" }
 
 // Probability monad, return and bind
-primitive return   forall(p:space, A)   (x :[p] A)                              : fuzzy A { "_return" }
-primitive p_sample forall(p:space, A,B) (x :[p][] fuzzy A) (f :[p][] A -> fuzzy B) : fuzzy B { "_bind"   }
+primitive return   forall(A, p:space)   (x :[p] A)                              : fuzzy A { "_return" }
+primitive p_sample forall(A,B, p:space) (x :[p][] fuzzy A) (f :[p][] A -> fuzzy B) : fuzzy B { "_bind"   }
 
 primitive cswp forall (p : space) (t :[p][] (num,[p] num)) : (num,[p] num) { "cswp" }
 
@@ -89,6 +89,6 @@ primitive parse_queries forall (p : space) (dbs:[p][] db_source) : (clipped,[p] 
 // primitive zero (u : ())                   : nat[0] { "zero" }
 // primitive succ forall(i:size) (e: nat[i]) : nat[i+1] { "succ" }
 
-primitive nil  forall(p : space, A)         (u :[p] ())                      : list(A)[Z]   { "nil" }
-primitive cons forall(p : space, A, i:size) (e :[p][] A) (el :[p][] list(A)[i]) : list(A)[S i] { "cons" }
+primitive nil  forall(A)         (u :[1.0] ())                      : list(A)[Z]   { "nil" }
+primitive cons forall(A, i:size) (e :[1.0][] A) (el :[1.0][] list(A)[i]) : list(A)[S i] { "cons" }
 

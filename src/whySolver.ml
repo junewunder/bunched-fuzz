@@ -31,33 +31,6 @@ let why_debug   fi   = message 4 Opts.SMT fi
 let why_debug2  fi   = message 5 Opts.SMT fi
 let why_debug3  fi   = message 6 Opts.SMT fi
 
-(* We will likely borrow the EC implementation for this file *)
-
-(* let alt_ergo : Whyconf.config_prover =
-  let fp = Whyconf.parse_filter_prover "Alt-Ergo"   in
-  (* all provers that have the name "Alt-Ergo" *)
-  let provers = Whyconf.filter_provers WC.config fp in
-  if Whyconf.Mprover.is_empty provers then begin
-    Format.eprintf "heyyy@.";
-    Format.eprintf "provers empty: %b@." @@ Whyconf.Mprover.is_empty @@ Whyconf.get_provers WC.config;
-    List.iter
-      (fun p -> print_endline (Whyconf.get_complete_command p ~with_steps:false))
-      (Whyconf.Mprover.values @@ Whyconf.get_provers WC.config);
-    print_endline @@ Whyconf.get_conf_file WC.config;
-    Format.eprintf "Prover Alt-Ergo not installed or not configured@.";
-    exit 0
-  end else
-    snd (Whyconf.Mprover.max_binding provers)
-
-(* loading the Alt-Ergo driver *)
-let alt_ergo_driver : Driver.driver =
-  try
-    Whyconf.load_driver WC.main WC.env alt_ergo
-  with e ->
-    Format.eprintf "Failed to load driver for alt-ergo: %a@."
-      Exn_printer.exn_printer e;
-    exit 1 *)
-
 let z3 : Whyconf.config_prover =
   let fp = Whyconf.parse_filter_prover "Z3"   in
   let provers = Whyconf.filter_provers WC.config fp in
@@ -136,15 +109,15 @@ let post cs =
 open Constr
 
 let send_smt cs =
-  let i       = cs.c_info                            in
-  let why3_cs = WT.why3_translate cs                 in
-
-  why_info i "!*! Solving Constraint: @[%a@]" Print.pp_cs cs;
-  why_debug i "!*! Why3 term: @[%a@]"  Why3.Pretty.print_term why3_cs;
-  why_debug i "!*! -----------------------------------------------";
+  let i = cs.c_info in
 
   if Opts.comp_enabled Opts.SMT then
-    post why3_cs
+    (why_info i "!*! Generated Constraint:\n\t @[%a@]\n" Print.pp_cs cs;
+    let why3_cs = WT.why3_translate cs in (
+      why_debug i "!*! Why3 term: @[%a@]"  Why3.Pretty.print_term why3_cs;
+      why_debug i "!*! -----------------------------------------------";
+      post why3_cs
+    ))
   else
     true
 

@@ -1,0 +1,8 @@
+function id
+  forall (A, n : size, p : space)
+    (l :[p] list(A)[n])
+  : list(A)[n] {
+  l
+}
+
+id
