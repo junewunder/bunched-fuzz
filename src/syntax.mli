@@ -129,6 +129,7 @@ type ty =
   | TySizedNat of si
   | TySizedNum of si
   | TyList     of ty * si
+  | TyPList    of ty * p
   [@@deriving show]
 
 (* XXX: This is incorrect, right now it shifts all the indexes, thus
@@ -201,6 +202,8 @@ type term =
 
   (*                      t      return ty of {nil => tm1  | (    x     ::     xs      ) [si]       => tm2 } *)
   | TmListCase  of info * term * ty                 * term * binder_info * binder_info * binder_info * term
+  (*                      t      return ty of {nil => tm1  | (    xs    ) => tm2 } *)
+  | TmPListCase  of info * term * ty                 * term * binder_info * term
   (*                      t      return ty of {Z => tm1  | (S x)         [si]       => tm2 }                 *)
   | TmNatCase   of info * term * ty               * term * binder_info * binder_info * term
 

@@ -92,3 +92,6 @@ primitive parse_queries forall (p : space) (dbs:[p][] db_source) : (clipped,[p] 
 primitive nil  forall(A)         (u :[1.0] ())                      : list(A)[Z]   { "nil" }
 primitive cons forall(A, i:size) (e :[1.0][] A) (el :[1.0][] list(A)[i]) : list(A)[S i] { "cons" }
 
+primitive pnil  forall(A, p: space) (u :[p][1.0] ()) : plist(A)[p] { "pnil" }
+primitive pcons forall(A, p: space) (pair :[p][1.0] (A ,[p] plist(A)[p])) : plist(A)[p] { "pcons" }
+

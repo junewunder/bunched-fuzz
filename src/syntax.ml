@@ -211,6 +211,7 @@ type ty =
   | TySizedNat of si
   | TySizedNum of si
   | TyList     of ty * si
+  | TyPList    of ty * p
 [@@deriving show]
 
 (* map over types, first argument: action on vars, second argument
@@ -223,6 +224,7 @@ let rec ty_map n fv fsi ty = match ty with
   | TySizedNat si           -> TySizedNat(fsi n si)
   | TySizedNum si           -> TySizedNum(fsi n si)
   | TyList (ty, sz)         -> TyList(ty_map n fv fsi  ty, fsi n sz)
+  | TyPList (ty, p)         -> TyPList(ty_map n fv fsi  ty, p)
   (* ADT *)
   | TyUnion(ty1, ty2)       -> TyUnion    (ty_map n fv fsi ty1, ty_map n fv fsi ty2)
   | TyTensor(ty1, ty2, p)      -> TyTensor   (ty_map n fv fsi ty1, ty_map n fv fsi ty2, p)
@@ -323,6 +325,8 @@ type term =
 
   (*                      t      return ty of {nil => tm1  | (    x     ::     xs      ) [si]       => tm2 } *)
   | TmListCase  of info * term * ty                 * term * binder_info * binder_info * binder_info * term
+  (*                      t      return ty of {nil => tm1  | (    xs    ) => tm2 } *)
+  | TmPListCase  of info * term * ty                 * term * binder_info * term
   (*                      t      return ty of {Z => tm1  | (S x)         [si]       => tm2 }                 *)
   | TmNatCase   of info * term * ty               * term * binder_info * binder_info * term
 
@@ -403,6 +407,9 @@ let rec map_term_ty_aux n ft fsi tm =
   | TmListCase(i,      tm,      ty,      tm_l, bi_x, bi_xs, bi_si,      tm_r) ->
     TmListCase(i, tf n tm, ft n ty, tf n tm_l, bi_x, bi_xs, bi_si, tf n tm_r)
 
+  | TmPListCase(i,      tm,      ty,      tm_l, bi_xs,      tm_r) ->
+    TmPListCase(i, tf n tm, ft n ty, tf n tm_l, bi_xs, tf n tm_r)
+
   | TmNatCase(i,      tm,      ty,      tm_l, bi_n, bi_si,      tm_r)    ->
     TmNatCase(i, tf n tm, ft n ty, tf n tm_l, bi_n, bi_si, tf n tm_r)
 
@@ -470,6 +477,7 @@ let tmInfo t = match t with
 
   (* Dependent stuff *)
   | TmListCase(fi,_,_,_,_,_,_,_) -> fi
+  | TmPListCase(fi,_,_,_,_,_) -> fi
   | TmNatCase(fi,_,_,_,_,_,_)    -> fi
 
   (* *)

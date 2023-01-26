@@ -258,6 +258,10 @@ module TypeSub = struct
       check_type_sub i tyl tyr >>
       check_sens_eq  i sil sir
 
+    | TyPList(ty1, p1), TyPList(ty2, p2) ->
+      check_type_sub i ty1 ty2 >>
+      check_p_sub i p1 p2
+
     | _, _ -> fail
 
   (* Check whether ty is compatible (modulo subtyping) with annotation
@@ -336,6 +340,11 @@ module TypeSub = struct
     match ty with
     | TyList (ty, si) -> return (ty, si)
     | _               -> fail i @@ WrongShape (ty, "list")
+
+  let check_plist_shape i ty =
+    match ty with
+    | TyPList (ty, p) -> return (ty, p)
+    | _               -> fail i @@ WrongShape (ty, "plist")
 
   let check_mu_shape i ty =
     match ty with
@@ -731,6 +740,7 @@ let rec type_of (t : term) : (ty * bsi_ctx) checker  =
       (* XXX: Do we need to check that sz has kind Size? *)
       (* EG: It wouldn't hurt, but I cannot see how it could slip. *)
 
+      let* p_basis = get_p_basis i (Some (PConst 1.0)) in
       (* Case for nil, ntm *)
       with_new_ctx (cs_add_eq sz SiZero) begin
         let* (ty_ntm, sis_ntm) = type_of ntm in
@@ -748,7 +758,8 @@ let rec type_of (t : term) : (ty * bsi_ctx) checker  =
 
         (* We must shift the list types as we are under an extended context. *)
         let ty_e_s = ty_shift 0 1 ty_e' in
-        with_extended_ctx_2 i elem.b_name ty_e_s list.b_name (TyList (ty_e_s, sz')) (PConst 1.0) begin
+        with_extended_ctx_2 i elem.b_name ty_e_s list.b_name (TyList (ty_e_s, sz')) p_basis begin
+
           (* NOTE: sz must be shifted, it comes from a smaller context *)
           let sz_s = si_shift 0 1 sz in
 
@@ -774,6 +785,37 @@ let rec type_of (t : term) : (ty * bsi_ctx) checker  =
       return (ty, add_sens (case_sens sz sis_ntm si sis_ctm)
         (scale_sens (Some (SiCase (sz, si_zero, si, SiLub (si_elem, si_list))))
           sis_e))
+
+    | TmPListCase(i, tm, ty, ntm, pair, ctm) ->
+      let* p_basis = get_p_basis i (Some (PConst 1.0)) in
+      let* (ty_e, sis_e) = type_of tm in
+      let* (ty_e', p) = check_plist_shape i ty_e in
+
+      (* Case for nil, ntm *)
+      begin
+        let* (ty_ntm, sis_ntm) = type_of ntm in
+        check_type_sub i ty_ntm ty >>
+        return (ty_ntm, sis_ntm)
+      end >>= fun (_ty_ntm, sis_nilterm) ->
+
+      (* Case for cons *)
+
+      (* We must shift the list types as we are under an extended context. *)
+      with_extended_ctx i pair.b_name (TyTensor (ty_e', (TyPList (ty_e', p)), p)) p_basis begin
+        begin
+          let* (ty_ctm, sis_ctm) = type_of ctm in
+          check_type_sub i ty_ctm ty >>
+          return (ty_ctm, sis_ctm)
+        end
+      end
+      >>= fun (_ty_rtm, si_pair, sis_pairterm) ->
+
+    let si_pair = si_of_bsi si_pair in
+
+    return (ty, add_sens (lub_sens sis_nilterm sis_pairterm) (scale_sens (Some si_pair) sis_e))
+    (* return (ty, add_sens (case_sens sz sis_ntm si sis_ctm)
+      (scale_sens (Some (SiCase (sz, si_zero, si, SiLub (si_elem, si_list))))
+        sis_e)) *)
 
     (* Pack/Unpack *)
     | TmPack(i, _, _, _) ->

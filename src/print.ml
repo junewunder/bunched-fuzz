@@ -222,6 +222,7 @@ let rec pp_type ppf ty = match ty with
   | TySizedNat sz           -> fprintf ppf "%s[%a]" (u_sym Symbols.Nat) pp_si sz
   | TySizedNum si           -> fprintf ppf "%s[%a]" (u_sym Symbols.Num) pp_si si
   | TyList (ty, si)         -> fprintf ppf "list(%a)[%a]" pp_type ty pp_si si
+  | TyPList (ty, p)         -> fprintf ppf "plist(%a)[%a]" pp_type ty pp_p p
   (* ADT *)
   | TyUnion(ty1, ty2)       -> fprintf ppf "(%a @<1>%s @[<h>%a@])" pp_type ty1 (u_sym Symbols.Union)  pp_type ty2
   | TyTensor(ty1, ty2, p)   -> fprintf ppf "(%a @<1>%s[%a] %a)" pp_type ty1 (u_sym Symbols.Tensor) pp_p p pp_type ty2
@@ -366,6 +367,11 @@ let rec pp_term ppf t =
     fprintf ppf "listcase @[%a@] return [%a] {@\n   [] @<1>%s @[%a@]@\n | (%a :: %a)[%a] @<1>%s @[%a@]@\n}"
       pp_term tm pp_type ty (u_sym Symbols.DblArrow) pp_term ltm
       pp_binfo elem pp_binfo list pp_binfo si (u_sym Symbols.DblArrow) pp_term rtm
+
+  | TmPListCase(_, tm, ty, ltm, pair, rtm) ->
+    fprintf ppf "plistcase @[%a@] return [%a] {@\n   [] @<1>%s @[%a@]@\n | %a @<1>%s @[%a@]@\n}"
+      pp_term tm pp_type ty (u_sym Symbols.DblArrow) pp_term ltm
+      pp_binfo pair (u_sym Symbols.DblArrow) pp_term rtm
 
   | TmNatCase(_, tm, ty, ltm, nat, si, rtm) ->
     fprintf ppf "natcase @[%a@] return [%a] {@\n   Z @<1>%s @[%a@]@\n | S(%a)[%a] @<1>%s @[%a@]@\n}"
