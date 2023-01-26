@@ -150,6 +150,33 @@ module Optimize = struct
     c_cs = SiEq (si1, si2) :: cs.c_cs
   }
 
+  let simpl_si_mult si1 si2 =
+    match si1, si2 with
+    | SiConst 1.0, _ -> si2
+    | _, SiConst 1.0 -> si1
+    | SiConst c1, SiConst c2 -> SiConst (c1 *. c2)
+    | _ -> SiMult (si1, si2)
+
+  let rec simpl_contr_facs si =
+    let f = simpl_contr_facs in
+    match si with
+      SiVar _ | SiZero | SiSucc _ | SiConst _ | SiInfty -> si
+    | SiAdd  (x, y)   -> SiAdd (f x, f y)
+    | SiMult (x, y)   -> simpl_si_mult (f x) (f y)
+    | SiRoot (p, s)   -> SiRoot (p, f s)
+    | SiLp (s1, s2, p) -> SiLp (f s1, f s2, p)
+    | SiContrFac (p, q) when p = q -> SiConst 1.0
+    | SiContrFac (p, q) -> SiContrFac (p, q)
+    | SiLub  (s1, s2) -> SiLub (f s1, f s2)
+    | SiSup  (bi, k, s) -> SiSup (bi, k, f s)
+    | SiCase (s, s0, bi, sn) -> SiCase (f s, f s0, bi, f sn)
+
+  let simpl_contr_facs_constraint cs =
+    { cs with
+      c_lower = simpl_contr_facs cs.c_lower
+    ; c_upper = simpl_contr_facs cs.c_upper
+    }
+
   let rec is_standard (si : si) : bool =
     match si with
     | SiZero
@@ -222,7 +249,7 @@ let add_cs cs =
   match Decide.decide_leq cs.c_lower cs.c_upper with
   | Some _res-> ()
   | _        -> let cs = Optimize.leq_simplify cs in
-                (* cs_info UNKNOWN "%a" (Print.pp_list Print.pp_cs) cs ; *)
+                let cs = List.map Optimize.simpl_contr_facs_constraint cs in
                 cs_store := cs @ !cs_store
 
 let post_si_leq i (ctx : context) (sil : si) (sir : si) : bool =
