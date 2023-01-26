@@ -1,0 +1,21 @@
+function pzip
+  forall (A, B, p : space)
+    (xs :[p][1.0] plist(A)[p])
+    (ys :[p][1.0] plist(B)[p])
+  : plist((A ,[p] B))[p]
+  {
+    plistcase xs of plist((A,[p] B))[p] {
+      [] => pnil@[(A,[p]B)][p] ()
+    | pair_x =>
+      plistcase ys of plist((A,[p] B))[p] {
+        [] => pnil@[(A,[p]B)][p] ()
+      | pair_y =>
+        let (x, xs') = pair_x;
+        let (y, ys') = pair_y;
+        rec :[1.0] =[p] pzip@[A]@[B][p] xs' ys';
+        pcons@[(A ,[p] B)][p] ((x ,[p] y) ,[p] rec)
+      }
+    }
+  }
+
+pzip
