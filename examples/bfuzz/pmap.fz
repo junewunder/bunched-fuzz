@@ -1,0 +1,14 @@
+function pmap
+  forall (A, B, s : sens, p : space)
+    (f :[p][inf] (A -o[p][s] B))
+    (l :[p][s] plist(A)[p])
+  : plist(B)[p] {
+    plistcase l of plist(B)[p] {
+      []          => pnil@[B][p] ()
+    | xs =>
+      let (y, ys) = xs;
+      pcons@[B][p] ((f y) ,[p] (pmap@[A]@[B][s][p] f ys))
+  }
+}
+
+pmap

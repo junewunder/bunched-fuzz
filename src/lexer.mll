@@ -51,6 +51,7 @@ let reservedWords = [
   ("fun", fun i -> Parser.FUN i);
   ("case", fun i -> Parser.UNIONCASE i);
   ("listcase", fun i -> Parser.LISTCASE i);
+  ("plistcase", fun i -> Parser.PLISTCASE i);
   ("inl", fun i -> Parser.INL i);
   ("inr", fun i -> Parser.INR i);
   ("numcase", fun i -> Parser.NUMCASE i);
@@ -78,6 +79,7 @@ let reservedWords = [
   ("string", fun i -> Parser.STRING i);
   ("db_source", fun i -> Parser.DBSOURCE i);
   ("list", fun i -> Parser.LIST i);
+  ("plist", fun i -> Parser.PLIST i);
   ("sens", fun i -> Parser.SENS i);
   ("space", fun i -> Parser.SPACE i);
   ("size", fun i -> Parser.SIZE i);

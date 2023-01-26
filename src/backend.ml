@@ -120,6 +120,7 @@ let rec gen_term ppf t =
     | TmSiApp(_,_,_)         -> fprintf ppf "XXX TODO: TmInst"
 
     | TmListCase (_) -> fprintf ppf "XXX TODO list case"
+    | TmPListCase (_) -> fprintf ppf "XXX TODO plist case"
     | TmNatCase (_)  -> fprintf ppf "XXX TODO nat case"
 
     | TmUnpack(_,_,_,_,_)    -> fprintf ppf "XXX TODO: TmUnpack"

@@ -152,6 +152,7 @@ let rec remove_quantifiers ty = match ty with
 %token <Support.FileInfo.info> FUN
 %token <Support.FileInfo.info> UNIONCASE
 %token <Support.FileInfo.info> LISTCASE
+%token <Support.FileInfo.info> PLISTCASE
 %token <Support.FileInfo.info> NUMCASE
 %token <Support.FileInfo.info> OF
 %token <Support.FileInfo.info> FOLD
@@ -187,6 +188,7 @@ let rec remove_quantifiers ty = match ty with
 %token <Support.FileInfo.info> FORALL
 %token <Support.FileInfo.info> EXISTS
 %token <Support.FileInfo.info> LIST
+%token <Support.FileInfo.info> PLIST
 %token <Support.FileInfo.info> DBLCOLON
 %token <Support.FileInfo.info> NAT
 %token <Support.FileInfo.info> CLIPPED
@@ -382,11 +384,14 @@ STerm :
 
   | LISTCASE Expr OF Type LBRACE LBRACK RBRACK DBLARROW Term PIPE ID DBLCOLON ID LBRACK ID RBRACK DBLARROW Term RBRACE
       { fun ctx ->
-        (*let ctx_l  = extend_var    $11.v      ctx    in
-        let ctx_ll = extend_var    $13.v      ctx_l  in*)
         let ctx_ll = extend_var2 $11.v $13.v ctx in
         let ctx_si = extend_ty_var $15.v Sens ctx_ll in
         TmListCase($1, $2 ctx, $4 ctx, $9 ctx, nb_var $11.v, nb_var $13.v, nb_var $15.v, $18 ctx_si) }
+
+  | PLISTCASE Expr OF Type LBRACE LBRACK RBRACK DBLARROW Term PIPE ID DBLARROW Term RBRACE
+      { fun ctx ->
+        let ctx_ll = extend_var $11.v ctx in
+        TmPListCase($1, $2 ctx, $4 ctx, $9 ctx, nb_var $11.v, $13 ctx_ll) }
 
   | NUMCASE Expr OF Type LBRACE ZERO DBLARROW Term PIPE SUCC ID LBRACK ID RBRACK DBLARROW Term RBRACE
       { fun ctx ->
@@ -596,6 +601,8 @@ ComplexType :
       { fun ctx -> TyPrim1 (Prim1Fuzzy, ($2 ctx)) }
   | LIST LPAREN Type RPAREN LBRACK SizeTerm RBRACK
       { fun ctx -> TyList($3 ctx, $6 ctx) }
+  | PLIST LPAREN Type RPAREN SpaceAnn
+      { fun ctx -> TyPList($3 ctx, $5 ctx) }
   | AType
       { $1 }
 
