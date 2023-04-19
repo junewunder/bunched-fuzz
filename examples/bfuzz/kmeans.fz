@@ -44,6 +44,13 @@ primitive partition
   : plist((num ,[p] num) bag)[p]
   { "partition" }
 
+primitive Lp
+  forall (p : space)
+    (xs :[p] (num ,[p] num))
+    (ys :[p] (num ,[p] num))
+  : num
+  { "Lp" }
+
 primitive totx
   forall (p : space)
     (pts :[p][1.0] (num ,[p] num) bag)
